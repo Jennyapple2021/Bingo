@@ -65,7 +65,7 @@
         });
     }
 
-    function checkWin(called) {
+    function checkWin() {
         let cells = Array.from(document.querySelectorAll('.cell'));
         let matrix = [];
         for(let i=0; i<5; i++) matrix.push(cells.slice(i*5, i*5+5).map(el => el.classList.contains('selected')));
@@ -87,7 +87,13 @@
         }
     };
 
-    window.resetGame = () => { set(gameRef, { called: [], latest: "", winner: null }); clearInterval(autoInterval); autoInterval = null; generateBoard(); };
+    window.resetGame = () => { 
+        set(gameRef, { called: [], latest: "", winner: null }); 
+        clearInterval(autoInterval); 
+        autoInterval = null; 
+        generateBoard(); 
+        document.getElementById('room-status').innerText = "ເລີ່ມເກມໃໝ່ແລ້ວ...";
+    };
 
     onValue(gameRef, (snap) => {
         const data = snap.val(); if(!data) return;
@@ -102,7 +108,14 @@
             speak("ໝາຍເລກ " + data.latest); 
         }
 
-        if(data.called && checkWin()) { setTimeout(() => { speak("ບິງໂກແລ້ວ"); alert("🎉 ບິງໂກແລ້ວ!"); }, 500); }
+        if(data.winner) {
+            document.getElementById('room-status').innerText = "🎉 " + data.winner;
+        } else if(data.called && checkWin()) {
+            update(gameRef, { winner: "ມີຜູ້ຊະນະແລ້ວ!" });
+            clearInterval(autoInterval);
+            speak("ບິງໂກແລ້ວ!");
+            alert("🎉 ບິງໂກແລ້ວ! ເກມຢຸດຊົ່ວຄາວ");
+        }
     });
 
     generateBoard();
