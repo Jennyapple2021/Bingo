@@ -1,80 +1,8 @@
-<!DOCTYPE html>
-<html lang="th">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>🎰 BINGO REALTIME 🎰</title>
-    <style>
-        body { font-family: sans-serif; background: #f0f2f5; text-align: center; padding: 20px; }
-        .container { max-width: 500px; margin: auto; background: white; padding: 20px; border-radius: 15px; }
-        .grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 5px; margin-top: 15px; }
-        .cell { aspect-ratio: 1; background: #e4e6eb; border: none; border-radius: 5px; font-weight: bold; cursor: pointer; }
-        .cell.selected { background: #ff4757; color: white; }
-        .cell.free { background: #ffa502; color: white; }
-        button.btn { background: #2ed573; color: white; padding: 12px; border: none; border-radius: 5px; width: 100%; margin-top: 10px; font-weight: bold; }
-        .history { margin-top: 20px; text-align: left; background: #f8f9fa; padding: 10px; border-radius: 5px; }
-    </style>
-</head>
-<body>
-<div class="container">
-    <h1>🎰 BINGO 🎰</h1>
-    <div id="room-status" style="font-weight:bold; font-size: 20px;">ລໍຖ້າເລີ່ມເກມ...</div>
-    <div id="host-controls" style="display:none; margin-top:15px;">
-        <button class="btn" style="background:#ffa502;" onclick="toggleAuto()">▶️ ເລີ່ມ/ຢຸດ ອໍໂຕ້ (5s)</button>
-        <button class="btn" style="background:#ff4757;" onclick="resetGame()">🔄 ລ້າງກະດານ</button>
-    </div>
-    <div class="grid" id="bingo-board"></div>
-    <div class="history">
-        <strong>ເລກທີ່ອອກແລ້ວ:</strong>
-        <p id="number-list" style="word-break: break-all;"></p>
-    </div>
-</div>
-
-<script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-    import { getDatabase, ref, set, onValue, update } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
-
-    const firebaseConfig = { apiKey: "AIzaSyBOW0m7tdZl95srB6Mh2AcxNp9GQkTITrl", databaseURL: "https://bingoxjennie-default-rtdb.asia-southeast1.firebasedatabase.app", projectId: "bingoxjennie" };
-    const app = initializeApp(firebaseConfig);
-    const db = getDatabase(app);
-    const gameRef = ref(db, 'game_room');
-
-    let myBoard = [], autoInterval = null;
-    const isHost = (new URLSearchParams(window.location.search)).get('host') === 'true';
-    if(isHost) document.getElementById('host-controls').style.display = 'block';
-
-    function speak(text) { window.speechSynthesis.cancel(); const msg = new SpeechSynthesisUtterance(text); msg.lang = 'th-TH'; window.speechSynthesis.speak(msg); }
-
-    function generateBoard() {
-        let nums = Array.from({length: 75}, (_, i) => i + 1).sort(() => Math.random() - 0.5).slice(0, 25);
-        nums[12] = "FREE"; myBoard = nums;
-        const board = document.getElementById('bingo-board'); board.innerHTML = "";
-        nums.forEach((n, i) => {
-            const btn = document.createElement('button');
-            btn.className = "cell" + (n === "FREE" ? " free" : "");
-            btn.innerText = n === "FREE" ? "⭐" : n;
-            btn.id = "c" + i;
-            btn.onclick = () => {
-                // ໃຫ້ຈິ້ມໄດ້ສະເພາະເລກທີ່ອອກແລ້ວເທົ່ານັ້ນ
-                const called = document.getElementById('number-list').innerText.split(', ').map(Number);
-                if (n !== "FREE" && !called.includes(n)) { alert("ເລກນີ້ຍັງບໍ່ທັນອອກ!"); return; }
-                btn.classList.add('selected');
-                checkBingo();
-            };
-            board.appendChild(btn);
-        });
-    }
-
-    function checkBingo() {
-        let matrix = [];
-        for(let i=0; i<5; i++) matrix.push(Array.from(document.querySelectorAll('.cell')).slice(i*5, i*5+5).map(el => el.classList.contains('selected')));
-        let won = false;
-        for(let i=0; i<5; i++) { if(matrix[i].every(v => v) || matrix.map(r => r[i]).every(v => v)) won = true; }
-        if([0,1,2,3,4].every(i => matrix[i][i]) || [0,1,2,3,4].every(i => matrix[i][4-i])) won = true;
-        if(won) { speak("ບິງໂກແລ້ວ"); alert("🎉 ທ່ານບິງໂກແລ້ວ!"); }
-    }
-
     window.toggleAuto = () => {
+        // ເພີ່ມການກົດປຸ່ມເພື່ອເປີດໃຊ້ສຽງ (Browser policy)
+        const dummy = new SpeechSynthesisUtterance("");
+        window.speechSynthesis.speak(dummy);
+        
         if(autoInterval) { clearInterval(autoInterval); autoInterval = null; }
         else { 
             autoInterval = setInterval(() => {
@@ -83,20 +11,7 @@
                 if(available.length > 0) {
                     let n = available[Math.floor(Math.random() * available.length)];
                     update(gameRef, { called: [...called, n], latest: n });
-                }
+                } else { clearInterval(autoInterval); }
             }, 5000); 
         }
     };
-
-    window.resetGame = () => { set(gameRef, { called: [], latest: "", winner: null }); clearInterval(autoInterval); autoInterval = null; generateBoard(); };
-
-    onValue(gameRef, (snap) => {
-        const data = snap.val(); if(!data) return;
-        document.getElementById('number-list').innerText = (data.called || []).join(', ');
-        if(data.latest) { document.getElementById('room-status').innerText = "ເລກຫຼ້າສຸດ: " + data.latest; speak("ໝາຍເລກ " + data.latest); }
-    });
-
-    generateBoard();
-</script>
-</body>
-</html>
