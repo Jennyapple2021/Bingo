@@ -2,7 +2,6 @@
 <html lang="lo">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>🎰 BINGO REALTIME 🎰</title>
     <style>
         body { font-family: sans-serif; background: #f0f2f5; text-align: center; padding: 20px; }
@@ -17,21 +16,19 @@
 </head>
 <body>
 <div class="container">
-    <h1>🎰 BINGO 🎰</h1>
-    <div id="setup-area">
+    <h1>🎰 BINGO REALTIME 🎰</h1>
+    <div id="setup-area" style="display: block;">
         <input type="text" id="player-name" placeholder="ໃສ່ຊື່ຂອງທ່ານ..." required>
         <button class="btn" onclick="startGame()">ເລີ່ມຫຼິ້ນ</button>
     </div>
     
-    <div id="game-area" style="display:none;">
+    <div id="game-area" style="display: none;">
         <button class="btn" style="background:#ff4757;" onclick="initAudio()">🔊 ກົດປຸ່ມເປີດສຽງ</button>
         <div id="room-status" style="font-weight:bold; margin-top:10px;">ລໍຖ້າເລີ່ມ...</div>
-        
         <div id="host-controls" style="display:none; margin-top:15px;">
             <button class="btn" style="background:#1e90ff;" onclick="toggleAuto()">▶️ ເລີ່ມ/ຢຸດ ອໍໂຕ້ (5s)</button>
             <button class="btn" style="background:#ff9f43;" onclick="resetGame()">🔄 ລ້າງກະດານ</button>
         </div>
-        
         <div class="grid" id="bingo-board"></div>
         <p><strong>ເລກທີ່ອອກແລ້ວ:</strong> <span id="number-list"></span></p>
     </div>
@@ -47,14 +44,17 @@
 
     let myBoard = [], autoInterval = null, pName = "";
 
+    // ຟັງຊັນເລີ່ມຕົ້ນ: ບັງຄັບປ່ຽນ display
     window.startGame = () => {
-        pName = document.getElementById('player-name').value;
-        if(!pName) return alert("ກະລຸນາໃສ່ຊື່ກ່ອນ!");
+        const inputName = document.getElementById('player-name').value;
+        if(!inputName) return alert("ກະລຸນາໃສ່ຊື່ກ່ອນ!");
+        pName = inputName;
         document.getElementById('setup-area').style.display = 'none';
         document.getElementById('game-area').style.display = 'block';
         generateBoard();
     };
 
+    // ... (ສ່ວນຟັງຊັນອື່ນໆຄືເກົ່າ) ...
     function speak(text, force = false) {
         if (force) window.speechSynthesis.cancel();
         const msg = new SpeechSynthesisUtterance(text);
@@ -101,6 +101,7 @@
         set(gameRef, { called: [], latest: "", winner: null });
         window.speechSynthesis.cancel();
         generateBoard();
+        document.getElementById('room-status').innerText = "ລໍຖ້າເລີ່ມ...";
     };
 
     onValue(gameRef, (snap) => {
