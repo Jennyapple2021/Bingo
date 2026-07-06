@@ -16,8 +16,9 @@
 </head>
 <body>
 <div class="container">
-    <h1>🎰 BINGO REALTIME 🎰</h1>
-    <div id="setup-area" style="display: block;">
+    <h1>🎰 BINGO 🎰</h1>
+    
+    <div id="setup-area">
         <input type="text" id="player-name" placeholder="ໃສ່ຊື່ຂອງທ່ານ..." required>
         <button class="btn" onclick="startGame()">ເລີ່ມຫຼິ້ນ</button>
     </div>
@@ -44,17 +45,16 @@
 
     let myBoard = [], autoInterval = null, pName = "";
 
-    // ຟັງຊັນເລີ່ມຕົ້ນ: ບັງຄັບປ່ຽນ display
     window.startGame = () => {
         const inputName = document.getElementById('player-name').value;
-        if(!inputName) return alert("ກະລຸນາໃສ່ຊື່ກ່ອນ!");
+        if(!inputName) { alert("ກະລຸນາໃສ່ຊື່ກ່ອນ!"); return; }
         pName = inputName;
+        // ບັງຄັບເປີດໜ້າເກມ
         document.getElementById('setup-area').style.display = 'none';
         document.getElementById('game-area').style.display = 'block';
         generateBoard();
     };
 
-    // ... (ສ່ວນຟັງຊັນອື່ນໆຄືເກົ່າ) ...
     function speak(text, force = false) {
         if (force) window.speechSynthesis.cancel();
         const msg = new SpeechSynthesisUtterance(text);
@@ -73,7 +73,7 @@
             btn.id = "c" + i;
             btn.onclick = () => {
                 const called = document.getElementById('number-list').innerText.split(', ').filter(x => x !== "").map(Number);
-                if (n !== "FREE" && !called.includes(n)) return alert("ເລກນີ້ຍັງບໍ່ທັນອອກ!");
+                if (n !== "FREE" && !called.includes(n)) { alert("ເລກນີ້ຍັງບໍ່ທັນອອກ!"); return; }
                 btn.classList.add('selected');
                 if (checkWin()) update(gameRef, { winner: "🎉 ບິງໂກ! ຜູ້ຊະນະຄື: " + pName });
             };
