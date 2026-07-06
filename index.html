@@ -6,7 +6,7 @@
     <title>🎰 BINGO REALTIME 🎰</title>
     <style>
         body { font-family: sans-serif; background: #f0f2f5; text-align: center; padding: 20px; }
-        .container { max-width: 500px; margin: auto; background: white; padding: 20px; border-radius: 15px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        .container { max-width: 500px; margin: auto; background: white; padding: 20px; border-radius: 15px; }
         .grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 5px; margin-top: 15px; }
         .cell { aspect-ratio: 1; background: #e4e6eb; border: none; border-radius: 5px; font-weight: bold; }
         .cell.selected { background: #ff4757; color: white; }
@@ -15,11 +15,10 @@
     </style>
 </head>
 <body>
-
 <div class="container">
     <h1>🎰 BINGO 🎰</h1>
     <div id="room-status" style="font-weight:bold;">ລໍຖ້າເລີ່ມເກມ...</div>
-    <div id="host-controls" style="display:none; margin-top:15px;">
+    <div id="host-controls" style="display:none;">
         <button class="btn" style="background:#1e90ff;" onclick="drawNumber()">🎲 ສຸ່ມເລກ</button>
         <button class="btn" style="background:#ff4757;" onclick="resetGame()">🔄 ລ້າງກະດານ</button>
     </div>
@@ -44,6 +43,13 @@
     const isHost = (new URLSearchParams(window.location.search)).get('host') === 'true';
     if(isHost) document.getElementById('host-controls').style.display = 'block';
 
+    function speak(text) {
+        window.speechSynthesis.cancel();
+        const msg = new SpeechSynthesisUtterance(text);
+        msg.lang = 'th-TH';
+        window.speechSynthesis.speak(msg);
+    }
+
     function generateBoard() {
         let nums = Array.from({length: 75}, (_, i) => i + 1).sort(() => Math.random() - 0.5).slice(0, 25);
         nums[12] = "FREE";
@@ -62,16 +68,11 @@
     function checkWin(called) {
         let matrix = [];
         for(let i=0; i<5; i++) matrix.push(myBoard.slice(i*5, i*5+5).map(n => n === "FREE" || called.includes(n)));
-        
-        let won = false;
-        // Rows & Cols
         for(let i=0; i<5; i++) {
-            if(matrix[i].every(v => v) || matrix.map(r => r[i]).every(v => v)) won = true;
+            if(matrix[i].every(v => v) || matrix.map(r => r[i]).every(v => v)) return true;
         }
-        // Diagonals
-        if([0,1,2,3,4].every(i => matrix[i][i]) || [0,1,2,3,4].every(i => matrix[i][4-i])) won = true;
-        
-        return won;
+        if([0,1,2,3,4].every(i => matrix[i][i]) || [0,1,2,3,4].every(i => matrix[i][4-i])) return true;
+        return false;
     }
 
     window.drawNumber = () => {
@@ -91,13 +92,16 @@
     onValue(gameRef, (snap) => {
         const data = snap.val();
         if(!data) return;
-        
-        document.getElementById('room-status').innerText = data.latest ? "ເລກຫຼ້າສຸດ: " + data.latest : "ລໍຖ້າເລີ່ມເກມ...";
+        if(data.latest) {
+            document.getElementById('room-status').innerText = "ເລກຫຼ້າສຸດ: " + data.latest;
+            speak("หมายเลข " + data.latest);
+        }
         myBoard.forEach((n, i) => {
             if(data.called?.includes(n) || n === "FREE") document.getElementById('c'+i).classList.add('selected');
         });
 
-        if(checkWin(data.called || [])) {
+        if(data.called && checkWin(data.called)) {
+            speak("ບິງໂກແລ້ວ");
             alert("🎉 ມີຜູ້ຊະນະແລ້ວ! ກຽມເລີ່ມເກມໃໝ່...");
             if(isHost) resetGame();
         }
