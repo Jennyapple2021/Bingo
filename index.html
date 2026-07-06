@@ -8,7 +8,7 @@
         body { font-family: sans-serif; background: #f0f2f5; text-align: center; padding: 20px; }
         .container { max-width: 500px; margin: auto; background: white; padding: 20px; border-radius: 15px; }
         .grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 5px; margin-top: 15px; }
-        .cell { aspect-ratio: 1; background: #e4e6eb; border: none; border-radius: 5px; font-weight: bold; }
+        .cell { aspect-ratio: 1; background: #e4e6eb; border: none; border-radius: 5px; font-weight: bold; cursor: pointer; }
         .cell.selected { background: #ff4757; color: white; }
         .cell.free { background: #ffa502; color: white; }
         button.btn { background: #2ed573; color: white; padding: 12px; border: none; border-radius: 5px; width: 100%; margin-top: 10px; font-weight: bold; }
@@ -35,7 +35,7 @@
     const db = getDatabase(app);
     const gameRef = ref(db, 'game_room');
 
-    let myBoard = [], autoInterval = null;
+    let myBoard = [], calledNumbers = [], autoInterval = null;
     const isHost = (new URLSearchParams(window.location.search)).get('host') === 'true';
     if(isHost) document.getElementById('host-controls').style.display = 'block';
 
@@ -45,13 +45,27 @@
         let nums = Array.from({length: 75}, (_, i) => i + 1).sort(() => Math.random() - 0.5).slice(0, 25);
         nums[12] = "FREE"; myBoard = nums;
         const board = document.getElementById('bingo-board'); board.innerHTML = "";
-        nums.forEach((n, i) => { const btn = document.createElement('button'); btn.className = "cell" + (n === "FREE" ? " free" : ""); btn.innerText = n === "FREE" ? "⭐" : n; btn.id = "c" + i; board.appendChild(btn); });
+        nums.forEach((n, i) => {
+            const btn = document.createElement('button');
+            btn.className = "cell" + (n === "FREE" ? " free" : "");
+            btn.innerText = n === "FREE" ? "⭐" : n;
+            btn.id = "c" + i;
+            btn.onclick = () => {
+                if ((n !== "FREE" && !calledNumbers.includes(n))) { alert("ເລກນີ້ຍັງບໍ່ທັນຖືກສຸ່ມ!"); return; }
+                btn.classList.add('selected');
+                checkBingo();
+            };
+            board.appendChild(btn);
+        });
     }
 
-    function checkWin(called) {
-        let matrix = []; for(let i=0; i<5; i++) matrix.push(myBoard.slice(i*5, i*5+5).map(n => n === "FREE" || called.includes(n)));
-        for(let i=0; i<5; i++) { if(matrix[i].every(v => v) || matrix.map(r => r[i]).every(v => v)) return true; }
-        return [0,1,2,3,4].every(i => matrix[i][i]) || [0,1,2,3,4].every(i => matrix[i][4-i]);
+    function checkBingo() {
+        let matrix = [];
+        for(let i=0; i<5; i++) matrix.push(Array.from(document.querySelectorAll('.cell')).slice(i*5, i*5+5).map(el => el.classList.contains('selected')));
+        let won = false;
+        for(let i=0; i<5; i++) { if(matrix[i].every(v => v) || matrix.map(r => r[i]).every(v => v)) won = true; }
+        if([0,1,2,3,4].every(i => matrix[i][i]) || [0,1,2,3,4].every(i => matrix[i][4-i])) won = true;
+        if(won) { speak("ບິງໂກແລ້ວ"); alert("🎉 ທ່ານບິງໂກແລ້ວ!"); }
     }
 
     window.drawNumber = () => {
@@ -71,9 +85,8 @@
 
     onValue(gameRef, (snap) => {
         const data = snap.val(); if(!data) return;
+        calledNumbers = data.called || [];
         if(data.latest) { document.getElementById('room-status').innerText = "ເລກຫຼ້າສຸດ: " + data.latest; speak("หมายเลข " + data.latest); }
-        myBoard.forEach((n, i) => { if(data.called?.includes(n) || n === "FREE") document.getElementById('c'+i).classList.add('selected'); });
-        if(data.called && checkWin(data.called)) { speak("ບິງໂກແລ້ວ"); alert("🎉 ມີຜູ້ຊະນະແລ້ວ!"); if(isHost) resetGame(); }
     });
 
     generateBoard();
