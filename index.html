@@ -2,6 +2,7 @@
 <html lang="lo">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>🎰 BINGO REALTIME 🎰</title>
     <style>
         body { font-family: sans-serif; background: #f0f2f5; text-align: center; padding: 20px; }
@@ -16,20 +17,21 @@
 </head>
 <body>
 <div class="container">
-    <h1>🎰 BINGO 🎰</h1>
-    
-    <div id="setup-area">
+    <h1>🎰 BINGO REALTIME 🎰</h1>
+    <div id="setup-area" style="display: block;">
         <input type="text" id="player-name" placeholder="ໃສ່ຊື່ຂອງທ່ານ..." required>
-        <button class="btn" onclick="startGame()">ເລີ່ມຫຼິ້ນ</button>
+        <button class="btn" onclick="window.startGame()">ເລີ່ມຫຼິ້ນ</button>
     </div>
     
     <div id="game-area" style="display: none;">
         <button class="btn" style="background:#ff4757;" onclick="initAudio()">🔊 ກົດປຸ່ມເປີດສຽງ</button>
         <div id="room-status" style="font-weight:bold; margin-top:10px;">ລໍຖ້າເລີ່ມ...</div>
+        
         <div id="host-controls" style="display:none; margin-top:15px;">
             <button class="btn" style="background:#1e90ff;" onclick="toggleAuto()">▶️ ເລີ່ມ/ຢຸດ ອໍໂຕ້ (5s)</button>
             <button class="btn" style="background:#ff9f43;" onclick="resetGame()">🔄 ລ້າງກະດານ</button>
         </div>
+        
         <div class="grid" id="bingo-board"></div>
         <p><strong>ເລກທີ່ອອກແລ້ວ:</strong> <span id="number-list"></span></p>
     </div>
@@ -46,13 +48,21 @@
     let myBoard = [], autoInterval = null, pName = "";
 
     window.startGame = () => {
-        const inputName = document.getElementById('player-name').value;
-        if(!inputName) { alert("ກະລຸນາໃສ່ຊື່ກ່ອນ!"); return; }
-        pName = inputName;
-        // ບັງຄັບເປີດໜ້າເກມ
+        const nameInput = document.getElementById('player-name').value;
+        if(!nameInput) { alert("ກະລຸນາໃສ່ຊື່ກ່ອນ!"); return; }
+        pName = nameInput;
+        
+        // ບັງຄັບເປີດໜ້າເກມດ້ວຍການປ່ຽນ Style ໂດຍກົງ
         document.getElementById('setup-area').style.display = 'none';
         document.getElementById('game-area').style.display = 'block';
+        
         generateBoard();
+    };
+
+    window.initAudio = () => {
+        const msg = new SpeechSynthesisUtterance("ພ້ອມແລ້ວ");
+        msg.lang = 'th-TH';
+        window.speechSynthesis.speak(msg);
     };
 
     function speak(text, force = false) {
@@ -73,7 +83,7 @@
             btn.id = "c" + i;
             btn.onclick = () => {
                 const called = document.getElementById('number-list').innerText.split(', ').filter(x => x !== "").map(Number);
-                if (n !== "FREE" && !called.includes(n)) { alert("ເລກນີ້ຍັງບໍ່ທັນອອກ!"); return; }
+                if (n !== "FREE" && !called.includes(n)) return alert("ເລກນີ້ຍັງບໍ່ທັນອອກ!");
                 btn.classList.add('selected');
                 if (checkWin()) update(gameRef, { winner: "🎉 ບິງໂກ! ຜູ້ຊະນະຄື: " + pName });
             };
@@ -107,9 +117,10 @@
     onValue(gameRef, (snap) => {
         const data = snap.val(); if(!data) return;
         document.getElementById('number-list').innerText = (data.called || []).join(', ');
+        
         if(data.winner) {
             document.getElementById('room-status').innerHTML = "<h2 style='color:red;'>" + data.winner + "</h2>";
-            clearInterval(autoInterval); autoInterval = null;
+            clearInterval(autoInterval);
             speak("ບິງໂກ! ຜູ້ຊະນະຄື " + data.winner.split(': ')[1], true);
         } else if(data.latest) {
             document.getElementById('room-status').innerText = "ເລກຫຼ້າສຸດ: " + data.latest;
