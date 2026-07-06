@@ -1,72 +1,46 @@
-const express = require('express');
-const app = express();
-const http = require('http').createServer(app);
-const io = require('socket.io')(http);
+<!DOCTYPE html>
+<html>
+<head>
+    <title>BINGO X JENNIE</title>
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-database-compat.js"></script>
+    <style>
+        body { background: white; font-family: sans-serif; text-align: center; color: black; }
+        .grid { display: grid; grid-template-columns: repeat(5, 50px); gap: 5px; justify-content: center; }
+        .cell { width: 50px; height: 50px; border: 2px solid red; display: flex; align-items: center; justify-content: center; font-weight: bold; cursor: pointer; }
+        .marked { background: red; color: white; }
+    </style>
+</head>
+<body>
+    <h1>BINGO X JENNIE</h1>
+    <input id="name" placeholder="ໃສ່ຊື່">
+    <button onclick="join()">ເຂົ້າເກມ</button>
+    <div id="board" class="grid" style="margin-top: 20px;"></div>
 
-// ໂຄງສ້າງ HTML/CSS/JS ລວມໃນນີ້
-app.get('/', (req, res) => {
-    res.send(`
-    <html>
-        <head>
-            <title>BINGO X JENNIE</title>
-            <style>
-                body { background: white; font-family: sans-serif; text-align: center; color: black; }
-                .btn { background: #d32f2f; color: white; padding: 15px 30px; border-radius: 25px; border: none; cursor: pointer; margin: 10px; }
-                .card { border: 2px solid #d32f2f; display: inline-grid; grid-template-columns: repeat(5, 50px); gap: 5px; padding: 10px; }
-            </style>
-        </head>
-        <body>
-            <h1>BINGO X JENNIE</h1>
-            <div id="lobby">
-                <input id="name" placeholder="ໃສ່ຊື່ຫຼິ້ນ">
-                <button class="btn" onclick="joinGame()">Join Game</button>
-            </div>
-            <div id="gameArea" style="display:none">
-                <div id="cardContainer"></div>
-                <button class="btn" onclick="callBingo()">BINGO!</button>
-            </div>
-            <script src="/socket.io/socket.io.js"></script>
-            <script>
-                const socket = io();
-                function joinGame() {
-                    const name = document.getElementById('name').value;
-                    socket.emit('join', name);
-                    document.getElementById('lobby').style.display = 'none';
-                    document.getElementById('gameArea').style.display = 'block';
-                }
-                socket.on('yourCard', (card) => {
-                    // Logic ສະແດງບັດ Bingo 5x5
-                });
-                function callBingo() { socket.emit('checkBingo'); }
-            </script>
-        </body>
-    </html>
-    `);
-});
+    <script>
+        const firebaseConfig = {
+            // ເອົາ Config ຈາກ Firebase ມາໃສ່ບ່ອນນີ້ (apiKey, projectId, etc.)
+        };
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.database();
 
-// Logic ເກມ (Server Side)
-let gameState = { players: [], drawnNumbers: [], isLocked: false };
-
-io.on('connection', (socket) => {
-    socket.on('join', (name) => {
-        gameState.players.push({ id: socket.id, name, card: generateCard() });
-        socket.emit('yourCard', gameState.players.find(p => p.id === socket.id).card);
-    });
-
-    socket.on('checkBingo', () => {
-        if (gameState.isLocked) return;
-        // ລະບົບກວດສອບ
-        const isWinner = verifyBingo(socket.id);
-        if (isWinner) {
-            gameState.isLocked = true;
-            io.emit('gameOver', 'Winner: ' + socket.id);
-        } else {
-            socket.emit('msg', 'Not a Bingo!');
+        function join() {
+            const name = document.getElementById('name').value;
+            if(!name) return alert("ໃສ່ຊື່ກ່ອນ");
+            renderBoard();
         }
-    });
-});
 
-function generateCard() { /* ສຸ່ມເລກ 5x5 */ }
-function verifyBingo(id) { /* ລະບົບກວດ */ return true; }
-
-http.listen(3000, () => console.log('Server running on port 3000'));
+        function renderBoard() {
+            const board = document.getElementById('board');
+            board.innerHTML = "";
+            for(let i=0; i<25; i++) {
+                const cell = document.createElement('div');
+                cell.className = 'cell';
+                cell.innerText = Math.floor(Math.random() * 75) + 1;
+                cell.onclick = function() { this.classList.toggle('marked'); };
+                board.appendChild(cell);
+            }
+        }
+    </script>
+</body>
+</html>
