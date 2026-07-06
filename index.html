@@ -3,25 +3,25 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>🎰 BINGO AUTO-CHECK 🎰</title>
+    <title>🎰 BINGO REALTIME 🎰</title>
     <style>
         body { font-family: sans-serif; background: #f0f2f5; text-align: center; padding: 20px; }
-        .container { max-width: 500px; margin: auto; background: white; padding: 20px; border-radius: 15px; }
+        .container { max-width: 500px; margin: auto; background: white; padding: 20px; border-radius: 15px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
         .grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 5px; margin-top: 15px; }
         .cell { aspect-ratio: 1; background: #e4e6eb; border: none; border-radius: 5px; font-weight: bold; }
         .cell.selected { background: #ff4757; color: white; }
         .cell.free { background: #ffa502; color: white; }
-        button.btn { background: #2ed573; color: white; padding: 10px 20px; border: none; border-radius: 5px; width: 100%; margin-top: 10px; font-weight: bold; }
+        button.btn { background: #2ed573; color: white; padding: 12px; border: none; border-radius: 5px; width: 100%; margin-top: 10px; font-weight: bold; }
     </style>
 </head>
 <body>
 
 <div class="container">
     <h1>🎰 BINGO 🎰</h1>
-    <div id="room-status" style="font-weight:bold; margin-bottom:10px;">กำลังโหลด...</div>
-    <div id="host-controls" style="display:none;">
-        <button class="btn" onclick="drawNumber()">🎲 สุ่มเลข</button>
-        <button class="btn" style="background:#ffa502;" onclick="toggleAutoDraw()">▶️ ออโต้ (5วิ)</button>
+    <div id="room-status" style="font-weight:bold;">ລໍຖ້າເລີ່ມເກມ...</div>
+    <div id="host-controls" style="display:none; margin-top:15px;">
+        <button class="btn" style="background:#1e90ff;" onclick="drawNumber()">🎲 ສຸ່ມເລກ</button>
+        <button class="btn" style="background:#ff4757;" onclick="resetGame()">🔄 ລ້າງກະດານ</button>
     </div>
     <div class="grid" id="bingo-board"></div>
 </div>
@@ -41,9 +41,7 @@
     const gameRef = ref(db, 'game_room');
 
     let myBoard = [];
-    let calledNumbers = [];
-    let isHost = (new URLSearchParams(window.location.search)).get('host') === 'true';
-
+    const isHost = (new URLSearchParams(window.location.search)).get('host') === 'true';
     if(isHost) document.getElementById('host-controls').style.display = 'block';
 
     function generateBoard() {
@@ -61,35 +59,47 @@
         });
     }
 
-    function checkBingo(called) {
+    function checkWin(called) {
         let matrix = [];
         for(let i=0; i<5; i++) matrix.push(myBoard.slice(i*5, i*5+5).map(n => n === "FREE" || called.includes(n)));
         
-        let win = false;
-        // Check Rows & Cols
+        let won = false;
+        // Rows & Cols
         for(let i=0; i<5; i++) {
-            if(matrix[i].every(v => v) || matrix.map(r => r[i]).every(v => v)) win = true;
+            if(matrix[i].every(v => v) || matrix.map(r => r[i]).every(v => v)) won = true;
         }
-        // Check Diagonals
-        if([0,1,2,3,4].every(i => matrix[i][i]) || [0,1,2,3,4].every(i => matrix[i][4-i])) win = true;
-
-        if(win) {
-            update(gameRef, { winner: "🎉 ມີຜູ້ຊະນະແລ້ວ! 🎉" });
-        }
+        // Diagonals
+        if([0,1,2,3,4].every(i => matrix[i][i]) || [0,1,2,3,4].every(i => matrix[i][4-i])) won = true;
+        
+        return won;
     }
 
-    onValue(gameRef, (snapshot) => {
-        const data = snapshot.val();
-        if(data) {
-            calledNumbers = data.called || [];
-            document.getElementById('room-status').innerText = data.latest ? "ເລກຫຼ້າສຸດ: " + data.latest : "ລໍຖ້າເລີ່ມເກມ...";
-            
-            myBoard.forEach((n, i) => {
-                if(calledNumbers.includes(n) || n === "FREE") document.getElementById('c'+i).classList.add('selected');
-            });
-            
-            checkBingo(calledNumbers);
-            if(data.winner) alert(data.winner);
+    window.drawNumber = () => {
+        let n = Math.floor(Math.random() * 75) + 1;
+        onValue(gameRef, (snap) => {
+            let called = snap.val().called || [];
+            if(!called.includes(n)) called.push(n);
+            update(gameRef, { called, latest: n });
+        }, {onlyOnce: true});
+    };
+
+    window.resetGame = () => {
+        set(gameRef, { called: [], latest: "", winner: null });
+        generateBoard();
+    };
+
+    onValue(gameRef, (snap) => {
+        const data = snap.val();
+        if(!data) return;
+        
+        document.getElementById('room-status').innerText = data.latest ? "ເລກຫຼ້າສຸດ: " + data.latest : "ລໍຖ້າເລີ່ມເກມ...";
+        myBoard.forEach((n, i) => {
+            if(data.called?.includes(n) || n === "FREE") document.getElementById('c'+i).classList.add('selected');
+        });
+
+        if(checkWin(data.called || [])) {
+            alert("🎉 ມີຜູ້ຊະນະແລ້ວ! ກຽມເລີ່ມເກມໃໝ່...");
+            if(isHost) resetGame();
         }
     });
 
