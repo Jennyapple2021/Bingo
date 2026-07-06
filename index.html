@@ -18,8 +18,9 @@
 <div class="container">
     <h1>🎰 BINGO 🎰</h1>
     <div id="room-status" style="font-weight:bold;">ລໍຖ້າເລີ່ມເກມ...</div>
-    <div id="host-controls" style="display:none;">
+    <div id="host-controls" style="display:none; margin-top:15px;">
         <button class="btn" style="background:#1e90ff;" onclick="drawNumber()">🎲 ສຸ່ມເລກ</button>
+        <button class="btn" style="background:#ffa502;" onclick="toggleAuto()">▶️ ສຸ່ມອໍໂຕ້ (5s)</button>
         <button class="btn" style="background:#ff4757;" onclick="resetGame()">🔄 ລ້າງກະດານ</button>
     </div>
     <div class="grid" id="bingo-board"></div>
@@ -29,82 +30,50 @@
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
     import { getDatabase, ref, set, onValue, update } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
 
-    const firebaseConfig = {
-        apiKey: "AIzaSyBOW0m7tdZl95srB6Mh2AcxNp9GQkTITrl",
-        databaseURL: "https://bingoxjennie-default-rtdb.asia-southeast1.firebasedatabase.app",
-        projectId: "bingoxjennie"
-    };
-
+    const firebaseConfig = { apiKey: "AIzaSyBOW0m7tdZl95srB6Mh2AcxNp9GQkTITrl", databaseURL: "https://bingoxjennie-default-rtdb.asia-southeast1.firebasedatabase.app", projectId: "bingoxjennie" };
     const app = initializeApp(firebaseConfig);
     const db = getDatabase(app);
     const gameRef = ref(db, 'game_room');
 
-    let myBoard = [];
+    let myBoard = [], autoInterval = null;
     const isHost = (new URLSearchParams(window.location.search)).get('host') === 'true';
     if(isHost) document.getElementById('host-controls').style.display = 'block';
 
-    function speak(text) {
-        window.speechSynthesis.cancel();
-        const msg = new SpeechSynthesisUtterance(text);
-        msg.lang = 'th-TH';
-        window.speechSynthesis.speak(msg);
-    }
+    function speak(text) { window.speechSynthesis.cancel(); const msg = new SpeechSynthesisUtterance(text); msg.lang = 'th-TH'; window.speechSynthesis.speak(msg); }
 
     function generateBoard() {
         let nums = Array.from({length: 75}, (_, i) => i + 1).sort(() => Math.random() - 0.5).slice(0, 25);
-        nums[12] = "FREE";
-        myBoard = nums;
-        const board = document.getElementById('bingo-board');
-        board.innerHTML = "";
-        nums.forEach((n, i) => {
-            const btn = document.createElement('button');
-            btn.className = "cell" + (n === "FREE" ? " free" : "");
-            btn.innerText = n === "FREE" ? "⭐" : n;
-            btn.id = "c" + i;
-            board.appendChild(btn);
-        });
+        nums[12] = "FREE"; myBoard = nums;
+        const board = document.getElementById('bingo-board'); board.innerHTML = "";
+        nums.forEach((n, i) => { const btn = document.createElement('button'); btn.className = "cell" + (n === "FREE" ? " free" : ""); btn.innerText = n === "FREE" ? "⭐" : n; btn.id = "c" + i; board.appendChild(btn); });
     }
 
     function checkWin(called) {
-        let matrix = [];
-        for(let i=0; i<5; i++) matrix.push(myBoard.slice(i*5, i*5+5).map(n => n === "FREE" || called.includes(n)));
-        for(let i=0; i<5; i++) {
-            if(matrix[i].every(v => v) || matrix.map(r => r[i]).every(v => v)) return true;
-        }
-        if([0,1,2,3,4].every(i => matrix[i][i]) || [0,1,2,3,4].every(i => matrix[i][4-i])) return true;
-        return false;
+        let matrix = []; for(let i=0; i<5; i++) matrix.push(myBoard.slice(i*5, i*5+5).map(n => n === "FREE" || called.includes(n)));
+        for(let i=0; i<5; i++) { if(matrix[i].every(v => v) || matrix.map(r => r[i]).every(v => v)) return true; }
+        return [0,1,2,3,4].every(i => matrix[i][i]) || [0,1,2,3,4].every(i => matrix[i][4-i]);
     }
 
     window.drawNumber = () => {
         let n = Math.floor(Math.random() * 75) + 1;
         onValue(gameRef, (snap) => {
             let called = snap.val().called || [];
-            if(!called.includes(n)) called.push(n);
-            update(gameRef, { called, latest: n });
+            if(!called.includes(n)) { called.push(n); update(gameRef, { called, latest: n }); }
         }, {onlyOnce: true});
     };
 
-    window.resetGame = () => {
-        set(gameRef, { called: [], latest: "", winner: null });
-        generateBoard();
+    window.toggleAuto = () => {
+        if(autoInterval) { clearInterval(autoInterval); autoInterval = null; }
+        else { drawNumber(); autoInterval = setInterval(drawNumber, 5000); }
     };
 
-    onValue(gameRef, (snap) => {
-        const data = snap.val();
-        if(!data) return;
-        if(data.latest) {
-            document.getElementById('room-status').innerText = "ເລກຫຼ້າສຸດ: " + data.latest;
-            speak("หมายเลข " + data.latest);
-        }
-        myBoard.forEach((n, i) => {
-            if(data.called?.includes(n) || n === "FREE") document.getElementById('c'+i).classList.add('selected');
-        });
+    window.resetGame = () => { set(gameRef, { called: [], latest: "", winner: null }); clearInterval(autoInterval); autoInterval = null; generateBoard(); };
 
-        if(data.called && checkWin(data.called)) {
-            speak("ບິງໂກແລ້ວ");
-            alert("🎉 ມີຜູ້ຊະນະແລ້ວ! ກຽມເລີ່ມເກມໃໝ່...");
-            if(isHost) resetGame();
-        }
+    onValue(gameRef, (snap) => {
+        const data = snap.val(); if(!data) return;
+        if(data.latest) { document.getElementById('room-status').innerText = "ເລກຫຼ້າສຸດ: " + data.latest; speak("หมายเลข " + data.latest); }
+        myBoard.forEach((n, i) => { if(data.called?.includes(n) || n === "FREE") document.getElementById('c'+i).classList.add('selected'); });
+        if(data.called && checkWin(data.called)) { speak("ບິງໂກແລ້ວ"); alert("🎉 ມີຜູ້ຊະນະແລ້ວ!"); if(isHost) resetGame(); }
     });
 
     generateBoard();
