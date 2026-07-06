@@ -61,6 +61,15 @@
             btn.className = "cell" + (n === "FREE" ? " free" : "");
             btn.innerText = n === "FREE" ? "⭐" : n;
             btn.id = "c" + i;
+            // ຜູ້ຫຼິ້ນຈິ້ມເອງ
+            btn.onclick = () => {
+                const called = document.getElementById('number-list').innerText.split(', ').map(Number);
+                if (n !== "FREE" && !called.includes(n)) { alert("ເລກນີ້ຍັງບໍ່ທັນອອກ!"); return; }
+                btn.classList.add('selected');
+                if (checkWin()) {
+                    alert("🎉 ບິງໂກແລ້ວ!");
+                }
+            };
             board.appendChild(btn);
         });
     }
@@ -98,23 +107,9 @@
     onValue(gameRef, (snap) => {
         const data = snap.val(); if(!data) return;
         document.getElementById('number-list').innerText = (data.called || []).join(', ');
-        
-        myBoard.forEach((n, i) => {
-            if(data.called?.includes(n) || n === "FREE") document.getElementById('c'+i).classList.add('selected');
-        });
-
         if(data.latest) { 
             document.getElementById('room-status').innerText = "ເລກຫຼ້າສຸດ: " + data.latest; 
             speak("ໝາຍເລກ " + data.latest); 
-        }
-
-        if(data.winner) {
-            document.getElementById('room-status').innerText = "🎉 " + data.winner;
-        } else if(data.called && checkWin()) {
-            update(gameRef, { winner: "ມີຜູ້ຊະນະແລ້ວ!" });
-            clearInterval(autoInterval);
-            speak("ບິງໂກແລ້ວ!");
-            alert("🎉 ບິງໂກແລ້ວ! ເກມຢຸດຊົ່ວຄາວ");
         }
     });
 
