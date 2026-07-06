@@ -16,6 +16,7 @@
         button.btn { background: #2ed573; color: white; border: none; padding: 12px 20px; font-size: 16px; font-weight: bold; border-radius: 8px; cursor: pointer; margin-top: 10px; width: 100%; }
         button.btn:hover { background: #26af5f; }
         .called-numbers { margin-top: 20px; font-size: 16px; background: #f1f2f6; padding: 12px; border-radius: 8px; text-align: left; max-height: 100px; overflow-y: auto; }
+        .flex-buttons { display: flex; gap: 10px; }
     </style>
 </head>
 <body>
@@ -26,7 +27,10 @@
     
     <div id="host-controls" style="display:none;">
         <button class="btn" style="background:#1e90ff;" onclick="drawNumber()">🎲 สุ่มจับเลขต่อไป</button>
-        <button class="btn" style="background:#ff4757;" onclick="resetGame()">🔄 ล้างกระดาน / เริ่มใหม่</button>
+        <div class="flex-buttons">
+            <button id="auto-btn" class="btn" style="background:#ffa502;" onclick="toggleAutoDraw()">▶️ เริ่มสุ่มอัตโนมัติ (5วิ)</button>
+            <button class="btn" style="background:#ff4757;" onclick="resetGame()">🔄 เริ่มใหม่</button>
+        </div>
     </div>
 
     <div class="grid" id="bingo-board"></div>
@@ -39,11 +43,11 @@
     </div>
 </div>
 
+<!-- Firebase SDK -->
 <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
     import { getDatabase, ref, set, onValue, update } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
 
-    // คอนฟิก Firebase ของคุณ Jennie
     const firebaseConfig = {
         apiKey: "AIzaSyBOW0m7tdZl95srB6Mh2AcxNp9GQkTITrl",
         authDomain: "bingoxjennie.firebaseapp.com",
@@ -61,15 +65,25 @@
     let isHost = false;
     let calledNumbers = [];
     let myBoard = [];
+    let autoInterval = null;
+    let lastSpokenNumber = null;
 
-    // ตรวจสอบสถานะ Host จากลิ้งค์ (?host=true)
     const urlParams = new URLSearchParams(window.location.search);
     if(urlParams.get('host') === 'true') {
         isHost = true;
         document.getElementById('host-controls').style.display = 'block';
     }
 
-    // สร้างตารางสุ่มให้ผู้เล่น
+    function speak(text) {
+        if ('speechSynthesis' in window) {
+            window.speechSynthesis.cancel();
+            const utterance = new SpeechSynthesisUtterance(text);
+            utterance.lang = 'th-TH';
+            utterance.rate = 0.9;
+            window.speechSynthesis.speak(utterance);
+        }
+    }
+
     function generateBoard() {
         let numbers = [];
         for(let i=1; i<=75; i++) numbers.push(i);
@@ -105,13 +119,13 @@
     }
 
     window.drawNumber = function() {
-        if(!isHost) return;
         let available = [];
         for(let i=1; i<=75; i++) {
             if(!calledNumbers.includes(i)) available.push(i);
         }
         if(available.length === 0) {
             alert("สุ่มครบทุกเลขแล้ว!");
+            if(autoInterval) toggleAutoDraw();
             return;
         }
         let picked = available[Math.floor(Math.random() * available.length)];
@@ -119,9 +133,26 @@
         update(gameRef, { called: calledNumbers, latest: picked });
     }
 
+    window.toggleAutoDraw = function() {
+        if(!isHost) return;
+        const autoBtn = document.getElementById('auto-btn');
+        if(autoInterval) {
+            clearInterval(autoInterval);
+            autoInterval = null;
+            autoBtn.innerText = "▶️ เริ่มสุ่มอัตโนมัติ (5วิ)";
+            autoBtn.style.background = "#ffa502";
+        } else {
+            drawNumber();
+            autoInterval = setInterval(drawNumber, 5000);
+            autoBtn.innerText = "⏸️ หยุดสุ่มอัตโนมัติ";
+            autoBtn.style.background = "#747d8c";
+        }
+    }
+
     window.resetGame = function() {
         if(!isHost) return;
         if(confirm("ต้องการเริ่มเกมใหม่ทั้งหมดใช่ไหม?")) {
+            if(autoInterval) toggleAutoDraw();
             set(gameRef, { called: [], latest: "" });
         }
     }
@@ -140,12 +171,18 @@
             
             if(data.latest) {
                 document.getElementById('room-status').innerHTML = `เลขล่าสุดที่ออก: <span style="font-size:26px; color:#ff4757;">${data.latest}</span>`;
+                if(data.latest !== lastSpokenNumber) {
+                    lastSpokenNumber = data.latest;
+                    speak("หมายเลข " + data.latest);
+                }
             } else {
                 document.getElementById('room-status').innerText = "รอโฮสต์เริ่มสุ่มเลข...";
+                lastSpokenNumber = null;
             }
 
             if(data.winner) {
                 alert(data.winner);
+                speak("มีคนบิงโกแล้วค่ะ");
                 update(gameRef, { winner: null }); 
             }
         } else {
