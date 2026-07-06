@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="th">
+<html lang="lo">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -12,22 +12,28 @@
         .cell.selected { background: #ff4757; color: white; }
         .cell.free { background: #ffa502; color: white; }
         button.btn { background: #2ed573; color: white; padding: 12px; border: none; border-radius: 5px; width: 100%; margin-top: 10px; font-weight: bold; cursor: pointer; }
-        .history { margin-top: 20px; text-align: left; background: #f8f9fa; padding: 10px; border-radius: 5px; border: 1px solid #ddd; }
+        input { padding: 10px; width: 80%; border-radius: 5px; border: 1px solid #ddd; margin-bottom: 10px; }
     </style>
 </head>
 <body>
 <div class="container">
-    <h1>🎰 BINGO 🎰</h1>
-    <button class="btn" style="background:#ff4757;" onclick="initAudio()">🔊 ກົດປຸ່ມນີ້ເພື່ອເປີດສຽງ</button>
-    <div id="room-status" style="font-weight:bold; margin-top:10px;">ລໍຖ້າເລີ່ມເກມ...</div>
-    <div id="host-controls" style="display:none; margin-top:15px;">
-        <button class="btn" style="background:#1e90ff;" onclick="toggleAuto()">▶️ ເລີ່ມ/ຢຸດ ອໍໂຕ້ (5s)</button>
-        <button class="btn" style="background:#ff9f43;" onclick="resetGame()">🔄 ລ້າງກະດານ</button>
+    <h1>🎰 BINGO REALTIME 🎰</h1>
+    <div id="setup-area">
+        <input type="text" id="player-name" placeholder="ໃສ່ຊື່ຂອງທ່ານ..." required>
+        <button class="btn" onclick="startGame()">ເລີ່ມຫຼິ້ນ</button>
     </div>
-    <div class="grid" id="bingo-board"></div>
-    <div class="history">
-        <strong>ເລກທີ່ອອກແລ້ວ:</strong>
-        <p id="number-list" style="word-break: break-all;"></p>
+    
+    <div id="game-area" style="display:none;">
+        <button class="btn" style="background:#ff4757;" onclick="initAudio()">🔊 ກົດປຸ່ມເປີດສຽງ</button>
+        <div id="room-status" style="font-weight:bold; margin-top:10px;">ລໍຖ້າເລີ່ມ...</div>
+        
+        <div id="host-controls" style="display:none; margin-top:15px;">
+            <button class="btn" style="background:#1e90ff;" onclick="toggleAuto()">▶️ ເລີ່ມ/ຢຸດ ອໍໂຕ້ (5s)</button>
+            <button class="btn" style="background:#ff9f43;" onclick="resetGame()">🔄 ລ້າງກະດານ</button>
+        </div>
+        
+        <div class="grid" id="bingo-board"></div>
+        <p><strong>ເລກທີ່ອອກແລ້ວ:</strong> <span id="number-list"></span></p>
     </div>
 </div>
 
@@ -36,21 +42,24 @@
     import { getDatabase, ref, set, onValue, update } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
 
     const firebaseConfig = { apiKey: "AIzaSyBOW0m7tdZl95srB6Mh2AcxNp9GQkTITrl", databaseURL: "https://bingoxjennie-default-rtdb.asia-southeast1.firebasedatabase.app", projectId: "bingoxjennie" };
-    const app = initializeApp(firebaseConfig);
-    const db = getDatabase(app);
+    const db = getDatabase(initializeApp(firebaseConfig));
     const gameRef = ref(db, 'game_room');
 
-    let myBoard = [], autoInterval = null;
-    const isHost = (new URLSearchParams(window.location.search)).get('host') === 'true';
-    if(isHost) document.getElementById('host-controls').style.display = 'block';
+    let myBoard = [], autoInterval = null, pName = "";
+
+    window.startGame = () => {
+        pName = document.getElementById('player-name').value;
+        if(!pName) return alert("ກະລຸນາໃສ່ຊື່ກ່ອນ!");
+        document.getElementById('setup-area').style.display = 'none';
+        document.getElementById('game-area').style.display = 'block';
+        generateBoard();
+    };
 
     window.initAudio = () => {
-        const msg = new SpeechSynthesisUtterance("ເປີດສຽງຮຽບຮ້ອຍແລ້ວ");
+        const msg = new SpeechSynthesisUtterance("ພ້ອມແລ້ວ");
         msg.lang = 'th-TH';
         window.speechSynthesis.speak(msg);
     };
-
-    function speak(text) { window.speechSynthesis.cancel(); const msg = new SpeechSynthesisUtterance(text); msg.lang = 'th-TH'; window.speechSynthesis.speak(msg); }
 
     function generateBoard() {
         let nums = Array.from({length: 75}, (_, i) => i + 1).sort(() => Math.random() - 0.5).slice(0, 25);
@@ -61,14 +70,11 @@
             btn.className = "cell" + (n === "FREE" ? " free" : "");
             btn.innerText = n === "FREE" ? "⭐" : n;
             btn.id = "c" + i;
-            // ຜູ້ຫຼິ້ນຈິ້ມເອງ
             btn.onclick = () => {
-                const called = document.getElementById('number-list').innerText.split(', ').map(Number);
-                if (n !== "FREE" && !called.includes(n)) { alert("ເລກນີ້ຍັງບໍ່ທັນອອກ!"); return; }
+                const called = document.getElementById('number-list').innerText.split(', ').filter(x => x !== "").map(Number);
+                if (n !== "FREE" && !called.includes(n)) return alert("ເລກນີ້ຍັງບໍ່ທັນອອກ!");
                 btn.classList.add('selected');
-                if (checkWin()) {
-                    alert("🎉 ບິງໂກແລ້ວ!");
-                }
+                if (checkWin()) update(gameRef, { winner: "🎉 ບິງໂກ! ຜູ້ຊະນະຄື: " + pName });
             };
             board.appendChild(btn);
         });
@@ -76,44 +82,27 @@
 
     function checkWin() {
         let cells = Array.from(document.querySelectorAll('.cell'));
-        let matrix = [];
-        for(let i=0; i<5; i++) matrix.push(cells.slice(i*5, i*5+5).map(el => el.classList.contains('selected')));
+        let matrix = []; for(let i=0; i<5; i++) matrix.push(cells.slice(i*5, i*5+5).map(el => el.classList.contains('selected')));
         for(let i=0; i<5; i++) { if(matrix[i].every(v => v) || matrix.map(r => r[i]).every(v => v)) return true; }
         return [0,1,2,3,4].every(i => matrix[i][i]) || [0,1,2,3,4].every(i => matrix[i][4-i]);
     }
 
     window.toggleAuto = () => {
         if(autoInterval) { clearInterval(autoInterval); autoInterval = null; }
-        else { 
-            autoInterval = setInterval(() => {
-                let called = document.getElementById('number-list').innerText.split(', ').filter(n => n !== "").map(Number);
-                let available = Array.from({length: 75}, (_, i) => i + 1).filter(n => !called.includes(n));
-                if(available.length > 0) {
-                    let n = available[Math.floor(Math.random() * available.length)];
-                    update(gameRef, { called: [...called, n], latest: n });
-                }
-            }, 5000); 
-        }
+        else autoInterval = setInterval(() => {
+            let called = document.getElementById('number-list').innerText.split(', ').filter(x => x !== "").map(Number);
+            let avail = Array.from({length: 75}, (_, i) => i + 1).filter(n => !called.includes(n));
+            if(avail.length > 0) {
+                let n = avail[Math.floor(Math.random() * avail.length)];
+                update(gameRef, { called: [...called, n], latest: n });
+            }
+        }, 5000);
     };
 
-    window.resetGame = () => { 
-        set(gameRef, { called: [], latest: "", winner: null }); 
-        clearInterval(autoInterval); 
-        autoInterval = null; 
-        generateBoard(); 
-        document.getElementById('room-status').innerText = "ເລີ່ມເກມໃໝ່ແລ້ວ...";
-    };
+    window.resetGame = () => set(gameRef, { called: [], latest: "", winner: null });
 
     onValue(gameRef, (snap) => {
         const data = snap.val(); if(!data) return;
         document.getElementById('number-list').innerText = (data.called || []).join(', ');
-        if(data.latest) { 
-            document.getElementById('room-status').innerText = "ເລກຫຼ້າສຸດ: " + data.latest; 
-            speak("ໝາຍເລກ " + data.latest); 
-        }
-    });
-
-    generateBoard();
-</script>
-</body>
-</html>
+        if(data.latest) {
+            document.getElementById('room-status').innerText = "ເລກຫຼ້າສຸດ: " +
