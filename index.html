@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🎰 BINGO REALTIME 🎰</title>
+    <style>
+        body { font-family: 'Arial', sans-serif; background-color: #f0f2f5; text-align: center; margin: 0; padding: 20px; }
+        .container { max-width: 500px; margin: auto; background: white; padding: 20px; border-radius: 15px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        h1 { color: #ff4757; margin: 10px 0; }
+        .status-box { background: #dfe4ea; padding: 12px; border-radius: 8px; margin-bottom: 15px; font-weight: bold; font-size: 18px; }
+        .grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; margin-top: 15px; }
+        .cell { aspect-ratio: 1; background: #e4e6eb; border: none; border-radius: 8px; font-size: 18px; font-weight: bold; cursor: pointer; transition: 0.2s; }
+        .cell.selected { background: #ff4757; color: white; }
+        .cell.free { background: #ffa502; color: white; font-size: 22px; }
+        button.btn { background: #2ed573; color: white; border: none; padding: 12px 20px; font-size: 16px; font-weight: bold; border-radius: 8px; cursor: pointer; margin-top: 10px; width: 100%; }
+        button.btn:hover { background: #26af5f; }
+        .called-numbers { margin-top: 20px; font-size: 16px; background: #f1f2f6; padding: 12px; border-radius: 8px; text-align: left; max-height: 100px; overflow-y: auto; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>🎰 BINGO 🎰</h1>
+    <div id="room-status" class="status-box">กำลังเชื่อมต่อระบบ...</div>
+    
+    <div id="host-controls" style="display:none;">
+        <button class="btn" style="background:#1e90ff;" onclick="drawNumber()">🎲 สุ่มจับเลขต่อไป</button>
+        <button class="btn" style="background:#ff4757;" onclick="resetGame()">🔄 ล้างกระดาน / เริ่มใหม่</button>
+    </div>
+
+    <div class="grid" id="bingo-board"></div>
+    
+    <button class="btn" onclick="checkBingo()">🎉 ฉันบิงโกแล้ว! 🎉</button>
+
+    <div class="called-numbers">
+        <strong>เลขที่ออกแล้ว:</strong>
+        <div id="number-list">ยังไม่มีการสุ่มเลข</div>
+    </div>
+</div>
+
+<script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+    import { getDatabase, ref, set, onValue, update } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
+
+    // คอนฟิก Firebase ของคุณ Jennie
+    const firebaseConfig = {
+        apiKey: "AIzaSyBOW0m7tdZl95srB6Mh2AcxNp9GQkTITrl",
+        authDomain: "bingoxjennie.firebaseapp.com",
+        databaseURL: "https://bingoxjennie-default-rtdb.asia-southeast1.firebasedatabase.app",
+        projectId: "bingoxjennie",
+        storageBucket: "bingoxjennie.firebasestorage.app",
+        messagingSenderId: "446170199241",
+        appId: "1:446170199241:web:4047fec4124f32201d1201"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getDatabase(app);
+    const gameRef = ref(db, 'game_room');
+
+    let isHost = false;
+    let calledNumbers = [];
+    let myBoard = [];
+
+    // ตรวจสอบสถานะ Host จากลิ้งค์ (?host=true)
+    const urlParams = new URLSearchParams(window.location.search);
+    if(urlParams.get('host') === 'true') {
+        isHost = true;
+        document.getElementById('host-controls').style.display = 'block';
+    }
+
+    // สร้างตารางสุ่มให้ผู้เล่น
+    function generateBoard() {
+        let numbers = [];
+        for(let i=1; i<=75; i++) numbers.push(i);
+        numbers.sort(() => Math.random() - 0.5);
+        
+        myBoard = numbers.slice(0, 25);
+        myBoard[12] = "FREE"; 
+        
+        const boardDiv = document.getElementById('bingo-board');
+        boardDiv.innerHTML = "";
+        
+        myBoard.forEach((num) => {
+            const btn = document.createElement('button');
+            if(num === "FREE") {
+                btn.className = "cell free";
+                btn.innerText = "⭐";
+            } else {
+                btn.className = "cell";
+                btn.innerText = num;
+                btn.id = "cell-" + num;
+                btn.onclick = () => toggleCell(btn, num);
+            }
+            boardDiv.appendChild(btn);
+        });
+    }
+
+    function toggleCell(btn, num) {
+        if(calledNumbers.includes(num)) {
+            btn.classList.toggle('selected');
+        } else {
+            alert("เลขนี้ยังไม่ได้ถูกสุ่มขึ้นมาเลยนะ!");
+        }
+    }
+
+    window.drawNumber = function() {
+        if(!isHost) return;
+        let available = [];
+        for(let i=1; i<=75; i++) {
+            if(!calledNumbers.includes(i)) available.push(i);
+        }
+        if(available.length === 0) {
+            alert("สุ่มครบทุกเลขแล้ว!");
+            return;
+        }
+        let picked = available[Math.floor(Math.random() * available.length)];
+        calledNumbers.push(picked);
+        update(gameRef, { called: calledNumbers, latest: picked });
+    }
+
+    window.resetGame = function() {
+        if(!isHost) return;
+        if(confirm("ต้องการเริ่มเกมใหม่ทั้งหมดใช่ไหม?")) {
+            set(gameRef, { called: [], latest: "" });
+        }
+    }
+
+    window.checkBingo = function() {
+        if(confirm("คุณมั่นใจนะว่าคุณบิงโกแล้วจริงๆ?")) {
+            update(gameRef, { winner: "มีคนกดบิงโกแล้วจ้า! 🎉 ตรวจสอบด่วน!" });
+        }
+    }
+
+    onValue(gameRef, (snapshot) => {
+        const data = snapshot.val();
+        if(data) {
+            calledNumbers = data.called || [];
+            document.getElementById('number-list').innerText = calledNumbers.join(', ') || "ยังไม่มีการสุ่มเลข";
+            
+            if(data.latest) {
+                document.getElementById('room-status').innerHTML = `เลขล่าสุดที่ออก: <span style="font-size:26px; color:#ff4757;">${data.latest}</span>`;
+            } else {
+                document.getElementById('room-status').innerText = "รอโฮสต์เริ่มสุ่มเลข...";
+            }
+
+            if(data.winner) {
+                alert(data.winner);
+                update(gameRef, { winner: null }); 
+            }
+        } else {
+            document.getElementById('room-status').innerText = "ห้องเกมกำลังรอโฮสต์เซ็ตระบบ...";
+        }
+    });
+
+    generateBoard();
+</script>
+
+</body>
+</html>
