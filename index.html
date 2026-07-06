@@ -1,17 +1,28 @@
-    window.toggleAuto = () => {
-        // ເພີ່ມການກົດປຸ່ມເພື່ອເປີດໃຊ້ສຽງ (Browser policy)
-        const dummy = new SpeechSynthesisUtterance("");
-        window.speechSynthesis.speak(dummy);
-        
-        if(autoInterval) { clearInterval(autoInterval); autoInterval = null; }
-        else { 
-            autoInterval = setInterval(() => {
-                let called = document.getElementById('number-list').innerText.split(', ').filter(n => n !== "").map(Number);
-                let available = Array.from({length: 75}, (_, i) => i + 1).filter(n => !called.includes(n));
-                if(available.length > 0) {
-                    let n = available[Math.floor(Math.random() * available.length)];
-                    update(gameRef, { called: [...called, n], latest: n });
-                } else { clearInterval(autoInterval); }
-            }, 5000); 
-        }
-    };
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <title>🎰 BINGO REALTIME 🎰</title>
+    <style>
+        body { font-family: sans-serif; background: #f0f2f5; text-align: center; padding: 20px; }
+        .container { max-width: 500px; margin: auto; background: white; padding: 20px; border-radius: 15px; }
+        button.btn { background: #2ed573; color: white; padding: 15px; border: none; border-radius: 5px; width: 100%; margin-top: 10px; font-weight: bold; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1>🎰 BINGO 🎰</h1>
+    <button class="btn" style="background:#ff4757;" onclick="unlockAudio()">🔊 ກົດປຸ່ມນີ້ເພື່ອເປີດສຽງ</button>
+    <div id="status" style="margin-top:20px; font-weight:bold;">ລໍຖ້າເລີ່ມ...</div>
+</div>
+
+<script>
+    function unlockAudio() {
+        const msg = new SpeechSynthesisUtterance("ເປີດສຽງຮຽບຮ້ອຍແລ້ວ");
+        msg.lang = 'th-TH';
+        window.speechSynthesis.speak(msg);
+        document.getElementById('status').innerText = "ສຽງພ້ອມໃຊ້ງານ, ເຂົ້າລິ້ງ Host ເພື່ອສຸ່ມເລກ!";
+    }
+</script>
+</body>
+</html>
