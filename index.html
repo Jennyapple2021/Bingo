@@ -55,11 +55,12 @@
         generateBoard();
     };
 
-    window.initAudio = () => {
-        const msg = new SpeechSynthesisUtterance("ພ້ອມແລ້ວ");
+    function speak(text, force = false) {
+        if (force) window.speechSynthesis.cancel();
+        const msg = new SpeechSynthesisUtterance(text);
         msg.lang = 'th-TH';
         window.speechSynthesis.speak(msg);
-    };
+    }
 
     function generateBoard() {
         let nums = Array.from({length: 75}, (_, i) => i + 1).sort(() => Math.random() - 0.5).slice(0, 25);
@@ -92,17 +93,31 @@
         else autoInterval = setInterval(() => {
             let called = document.getElementById('number-list').innerText.split(', ').filter(x => x !== "").map(Number);
             let avail = Array.from({length: 75}, (_, i) => i + 1).filter(n => !called.includes(n));
-            if(avail.length > 0) {
-                let n = avail[Math.floor(Math.random() * avail.length)];
-                update(gameRef, { called: [...called, n], latest: n });
-            }
+            if(avail.length > 0) update(gameRef, { called: [...called, avail[Math.floor(Math.random() * avail.length)]], latest: avail[0] });
         }, 5000);
     };
 
-    window.resetGame = () => set(gameRef, { called: [], latest: "", winner: null });
+    window.resetGame = () => {
+        set(gameRef, { called: [], latest: "", winner: null });
+        window.speechSynthesis.cancel(); // ຢຸດສຽງທັງໝົດ
+        generateBoard();
+    };
 
     onValue(gameRef, (snap) => {
         const data = snap.val(); if(!data) return;
         document.getElementById('number-list').innerText = (data.called || []).join(', ');
-        if(data.latest) {
-            document.getElementById('room-status').innerText = "ເລກຫຼ້າສຸດ: " +
+        
+        if(data.winner) {
+            document.getElementById('room-status').innerHTML = "<h2 style='color:red;'>" + data.winner + "</h2>";
+            clearInterval(autoInterval);
+            speak("ບິງໂກ! ຜູ້ຊະນະຄື " + data.winner.split(': ')[1], true);
+        } else if(data.latest) {
+            document.getElementById('room-status').innerText = "ເລກຫຼ້າສຸດ: " + data.latest;
+            speak("ໝາຍເລກ " + data.latest);
+        }
+    });
+
+    if((new URLSearchParams(window.location.search)).get('host') === 'true') document.getElementById('host-controls').style.display = 'block';
+</script>
+</body>
+</html>
