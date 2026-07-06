@@ -3,163 +3,78 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>🎰 BINGO REALTIME 🎰</title>
+    <title>🎰 BINGO AUTO-CHECK 🎰</title>
     <style>
-        body { font-family: 'Arial', sans-serif; background-color: #f0f2f5; text-align: center; margin: 0; padding: 20px; }
-        .container { max-width: 500px; margin: auto; background: white; padding: 20px; border-radius: 15px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
-        h1 { color: #ff4757; margin: 10px 0; }
-        .status-box { background: #dfe4ea; padding: 12px; border-radius: 8px; margin-bottom: 15px; font-weight: bold; font-size: 18px; }
-        .grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; margin-top: 15px; }
-        .cell { aspect-ratio: 1; background: #e4e6eb; border: none; border-radius: 8px; font-size: 18px; font-weight: bold; cursor: pointer; transition: 0.2s; }
+        body { font-family: sans-serif; background: #f0f2f5; text-align: center; padding: 20px; }
+        .container { max-width: 500px; margin: auto; background: white; padding: 20px; border-radius: 15px; }
+        .grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 5px; margin-top: 15px; }
+        .cell { aspect-ratio: 1; background: #e4e6eb; border: none; border-radius: 5px; font-weight: bold; }
         .cell.selected { background: #ff4757; color: white; }
-        .cell.free { background: #ffa502; color: white; font-size: 22px; }
-        button.btn { background: #2ed573; color: white; border: none; padding: 12px 20px; font-size: 16px; font-weight: bold; border-radius: 8px; cursor: pointer; margin-top: 10px; width: 100%; }
-        button.btn:hover { background: #26af5f; }
-        .called-numbers { margin-top: 20px; font-size: 16px; background: #f1f2f6; padding: 12px; border-radius: 8px; text-align: left; max-height: 100px; overflow-y: auto; }
-        .flex-buttons { display: flex; gap: 10px; }
+        .cell.free { background: #ffa502; color: white; }
+        button.btn { background: #2ed573; color: white; padding: 10px 20px; border: none; border-radius: 5px; width: 100%; margin-top: 10px; font-weight: bold; }
     </style>
 </head>
 <body>
 
 <div class="container">
     <h1>🎰 BINGO 🎰</h1>
-    <div id="room-status" class="status-box">กำลังเชื่อมต่อระบบ...</div>
-    
+    <div id="room-status" style="font-weight:bold; margin-bottom:10px;">กำลังโหลด...</div>
     <div id="host-controls" style="display:none;">
-        <button class="btn" style="background:#1e90ff;" onclick="drawNumber()">🎲 สุ่มจับเลขต่อไป</button>
-        <div class="flex-buttons">
-            <button id="auto-btn" class="btn" style="background:#ffa502;" onclick="toggleAutoDraw()">▶️ เริ่มสุ่มอัตโนมัติ (5วิ)</button>
-            <button class="btn" style="background:#ff4757;" onclick="resetGame()">🔄 เริ่มใหม่</button>
-        </div>
+        <button class="btn" onclick="drawNumber()">🎲 สุ่มเลข</button>
+        <button class="btn" style="background:#ffa502;" onclick="toggleAutoDraw()">▶️ ออโต้ (5วิ)</button>
     </div>
-
     <div class="grid" id="bingo-board"></div>
-    
-    <button class="btn" onclick="checkBingo()">🎉 ฉันบิงโกแล้ว! 🎉</button>
-
-    <div class="called-numbers">
-        <strong>เลขที่ออกแล้ว:</strong>
-        <div id="number-list">ยังไม่มีการสุ่มเลข</div>
-    </div>
 </div>
 
-<!-- Firebase SDK -->
 <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
     import { getDatabase, ref, set, onValue, update } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
 
     const firebaseConfig = {
         apiKey: "AIzaSyBOW0m7tdZl95srB6Mh2AcxNp9GQkTITrl",
-        authDomain: "bingoxjennie.firebaseapp.com",
         databaseURL: "https://bingoxjennie-default-rtdb.asia-southeast1.firebasedatabase.app",
-        projectId: "bingoxjennie",
-        storageBucket: "bingoxjennie.firebasestorage.app",
-        messagingSenderId: "446170199241",
-        appId: "1:446170199241:web:4047fec4124f32201d1201"
+        projectId: "bingoxjennie"
     };
 
     const app = initializeApp(firebaseConfig);
     const db = getDatabase(app);
     const gameRef = ref(db, 'game_room');
 
-    let isHost = false;
-    let calledNumbers = [];
     let myBoard = [];
-    let autoInterval = null;
-    let lastSpokenNumber = null;
+    let calledNumbers = [];
+    let isHost = (new URLSearchParams(window.location.search)).get('host') === 'true';
 
-    const urlParams = new URLSearchParams(window.location.search);
-    if(urlParams.get('host') === 'true') {
-        isHost = true;
-        document.getElementById('host-controls').style.display = 'block';
-    }
-
-    function speak(text) {
-        if ('speechSynthesis' in window) {
-            window.speechSynthesis.cancel();
-            const utterance = new SpeechSynthesisUtterance(text);
-            utterance.lang = 'th-TH';
-            utterance.rate = 0.9;
-            window.speechSynthesis.speak(utterance);
-        }
-    }
+    if(isHost) document.getElementById('host-controls').style.display = 'block';
 
     function generateBoard() {
-        let numbers = [];
-        for(let i=1; i<=75; i++) numbers.push(i);
-        numbers.sort(() => Math.random() - 0.5);
-        
-        myBoard = numbers.slice(0, 25);
-        myBoard[12] = "FREE"; 
-        
-        const boardDiv = document.getElementById('bingo-board');
-        boardDiv.innerHTML = "";
-        
-        myBoard.forEach((num) => {
+        let nums = Array.from({length: 75}, (_, i) => i + 1).sort(() => Math.random() - 0.5).slice(0, 25);
+        nums[12] = "FREE";
+        myBoard = nums;
+        const board = document.getElementById('bingo-board');
+        board.innerHTML = "";
+        nums.forEach((n, i) => {
             const btn = document.createElement('button');
-            if(num === "FREE") {
-                btn.className = "cell free";
-                btn.innerText = "⭐";
-            } else {
-                btn.className = "cell";
-                btn.innerText = num;
-                btn.id = "cell-" + num;
-                btn.onclick = () => toggleCell(btn, num);
-            }
-            boardDiv.appendChild(btn);
+            btn.className = "cell" + (n === "FREE" ? " free" : "");
+            btn.innerText = n === "FREE" ? "⭐" : n;
+            btn.id = "c" + i;
+            board.appendChild(btn);
         });
     }
 
-    function toggleCell(btn, num) {
-        if(calledNumbers.includes(num)) {
-            btn.classList.toggle('selected');
-        } else {
-            alert("เลขนี้ยังไม่ได้ถูกสุ่มขึ้นมาเลยนะ!");
+    function checkBingo(called) {
+        let matrix = [];
+        for(let i=0; i<5; i++) matrix.push(myBoard.slice(i*5, i*5+5).map(n => n === "FREE" || called.includes(n)));
+        
+        let win = false;
+        // Check Rows & Cols
+        for(let i=0; i<5; i++) {
+            if(matrix[i].every(v => v) || matrix.map(r => r[i]).every(v => v)) win = true;
         }
-    }
+        // Check Diagonals
+        if([0,1,2,3,4].every(i => matrix[i][i]) || [0,1,2,3,4].every(i => matrix[i][4-i])) win = true;
 
-    window.drawNumber = function() {
-        let available = [];
-        for(let i=1; i<=75; i++) {
-            if(!calledNumbers.includes(i)) available.push(i);
-        }
-        if(available.length === 0) {
-            alert("สุ่มครบทุกเลขแล้ว!");
-            if(autoInterval) toggleAutoDraw();
-            return;
-        }
-        let picked = available[Math.floor(Math.random() * available.length)];
-        calledNumbers.push(picked);
-        update(gameRef, { called: calledNumbers, latest: picked });
-    }
-
-    window.toggleAutoDraw = function() {
-        if(!isHost) return;
-        const autoBtn = document.getElementById('auto-btn');
-        if(autoInterval) {
-            clearInterval(autoInterval);
-            autoInterval = null;
-            autoBtn.innerText = "▶️ เริ่มสุ่มอัตโนมัติ (5วิ)";
-            autoBtn.style.background = "#ffa502";
-        } else {
-            drawNumber();
-            autoInterval = setInterval(drawNumber, 5000);
-            autoBtn.innerText = "⏸️ หยุดสุ่มอัตโนมัติ";
-            autoBtn.style.background = "#747d8c";
-        }
-    }
-
-    window.resetGame = function() {
-        if(!isHost) return;
-        if(confirm("ต้องการเริ่มเกมใหม่ทั้งหมดใช่ไหม?")) {
-            if(autoInterval) toggleAutoDraw();
-            set(gameRef, { called: [], latest: "" });
-        }
-    }
-
-    window.checkBingo = function() {
-        if(confirm("คุณมั่นใจนะว่าคุณบิงโกแล้วจริงๆ?")) {
-            update(gameRef, { winner: "มีคนกดบิงโกแล้วจ้า! 🎉 ตรวจสอบด่วน!" });
+        if(win) {
+            update(gameRef, { winner: "🎉 ມີຜູ້ຊະນະແລ້ວ! 🎉" });
         }
     }
 
@@ -167,31 +82,18 @@
         const data = snapshot.val();
         if(data) {
             calledNumbers = data.called || [];
-            document.getElementById('number-list').innerText = calledNumbers.join(', ') || "ยังไม่มีการสุ่มเลข";
+            document.getElementById('room-status').innerText = data.latest ? "ເລກຫຼ້າສຸດ: " + data.latest : "ລໍຖ້າເລີ່ມເກມ...";
             
-            if(data.latest) {
-                document.getElementById('room-status').innerHTML = `เลขล่าสุดที่ออก: <span style="font-size:26px; color:#ff4757;">${data.latest}</span>`;
-                if(data.latest !== lastSpokenNumber) {
-                    lastSpokenNumber = data.latest;
-                    speak("หมายเลข " + data.latest);
-                }
-            } else {
-                document.getElementById('room-status').innerText = "รอโฮสต์เริ่มสุ่มเลข...";
-                lastSpokenNumber = null;
-            }
-
-            if(data.winner) {
-                alert(data.winner);
-                speak("มีคนบิงโกแล้วค่ะ");
-                update(gameRef, { winner: null }); 
-            }
-        } else {
-            document.getElementById('room-status').innerText = "ห้องเกมกำลังรอโฮสต์เซ็ตระบบ...";
+            myBoard.forEach((n, i) => {
+                if(calledNumbers.includes(n) || n === "FREE") document.getElementById('c'+i).classList.add('selected');
+            });
+            
+            checkBingo(calledNumbers);
+            if(data.winner) alert(data.winner);
         }
     });
 
     generateBoard();
 </script>
-
 </body>
 </html>
