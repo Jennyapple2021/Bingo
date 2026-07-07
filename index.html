@@ -6,31 +6,32 @@
     <title>BINGO X JENNIE</title>
     <style>
         body { font-family: sans-serif; background: #f0f2f5; text-align: center; padding: 20px; }
-        .container { max-width: 500px; margin: auto; background: white; padding: 20px; border-radius: 15px; }
+        .container { max-width: 500px; margin: auto; background: white; padding: 20px; border-radius: 15px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
+        h1 { color: #ff0000; }
         .grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 5px; margin-top: 15px; }
         .cell { aspect-ratio: 1; border: 1px solid #ccc; display: flex; align-items: center; justify-content: center; font-weight: bold; cursor: pointer; background: #fff; }
         .cell.selected { background: #ff4757; color: white; }
         .cell.free { background: #ffa502; color: black; }
-        button.btn { background: #ff4757; color: white; padding: 12px; border: none; border-radius: 5px; width: 100%; margin-top: 10px; cursor: pointer; }
+        button.btn { background: #ff4757; color: white; padding: 12px; border: none; border-radius: 5px; width: 100%; margin-top: 10px; cursor: pointer; font-size: 16px; }
     </style>
 </head>
 <body>
     <div class="container">
         <h1>BINGO X JENNIE</h1>
         <div id="setup-area">
-            <input type="text" id="player-name" placeholder="ໃສ່ຊື່..." style="padding:10px; width:80%;">
+            <input type="text" id="player-name" placeholder="ໃສ່ຊື່ຂອງທ່ານ..." style="padding:10px; width:80%;">
             <button class="btn" onclick="startGame()">ເຂົ້າຮ່ວມເກມ</button>
         </div>
 
         <div id="game-area" style="display:none;">
-            <button class="btn" onclick="initAudio()">🔊 ກົດປຸ່ມເປີດສຽງ</button>
+            <button class="btn" onclick="initAudio()">🔊 ເປີດສຽງ (ກົດກ່ອນຫຼິ້ນ)</button>
             <div id="status-display" style="font-weight:bold; margin-top:15px; color:red;">ລໍຖ້າເລີ່ມ...</div>
             <div id="host-controls" style="display:none;">
-                <button class="btn" onclick="toggleAuto()">▶️ ເລີ່ມ/ຢຸດ ອໍໂຕ້</button>
+                <button class="btn" style="background:#2ed573;" onclick="toggleAuto()">▶️ ເລີ່ມ/ຢຸດ ອໍໂຕ້</button>
                 <button class="btn" onclick="resetGame()">🔄 ເລີ່ມເກມໃໝ່</button>
             </div>
             <div class="grid" id="bingo-board"></div>
-            <p>ເລກທີ່ອອກ: <span id="called-numbers"></span></p>
+            <p>ເລກທີ່ອອກແລ້ວ: <span id="called-numbers"></span></p>
         </div>
     </div>
 
@@ -43,11 +44,15 @@
 
         let pName = "", autoInterval = null;
 
-        window.initAudio = () => { window.speechSynthesis.speak(new SpeechSynthesisUtterance("ເປີດສຽງແລ້ວ")); };
+        window.initAudio = () => {
+            const utterance = new SpeechSynthesisUtterance("ເປີດສຽງແລ້ວ");
+            utterance.lang = 'th-TH';
+            window.speechSynthesis.speak(utterance);
+        };
 
         window.startGame = () => {
             pName = document.getElementById('player-name').value;
-            if(!pName) return alert("ໃສ່ຊື່ກ່ອນ!");
+            if(!pName) return alert("ກະລຸນາໃສ່ຊື່!");
             document.getElementById('setup-area').style.display = 'none';
             document.getElementById('game-area').style.display = 'block';
             generateBoard();
@@ -77,56 +82,48 @@
             let cells = Array.from(document.querySelectorAll('.cell'));
             let m = []; for(let i=0; i<5; i++) m.push(cells.slice(i*5, i*5+5).map(e => e.classList.contains('selected')));
             for(let i=0; i<5; i++) { if(m[i].every(v => v) || m.map(r => r[i]).every(v => v)) return true; }
-            return [0,1,2,3,4].every(i => m[i][i]) || [0,1,i=0,4].every(i => m[i][4-i]);
+            return [0,1,2,3,4].every(i => m[i][i]) || [0,1,2,3,4].every(i => m[i][4-i]);
         }
 
         window.toggleAuto = () => {
-            if(autoInterval) { clearInterval(autoInterval); autoInterval = null; }
-            else autoInterval = setInterval(() => {
-                onValue(gameRef, (snap) => {
-                    let d = snap.val();
-                    if(d && !d.winner) {
+            if(autoInterval) { clearInterval(autoInterval); autoInterval = null; alert("ຢຸດອໍໂຕ້"); }
+            else {
+                alert("ເລີ່ມອໍໂຕ້ແລ້ວ");
+                autoInterval = setInterval(() => {
+                    onValue(gameRef, (snap) => {
+                        let d = snap.val() || {called: []};
                         let called = d.called || [];
                         let available = Array.from({length: 75}, (_, i) => i + 1).filter(n => !called.includes(n));
                         if(available.length > 0) {
                             let n = available[Math.floor(Math.random() * available.length)];
                             update(gameRef, { called: [...called, n], latest: n });
                         }
-                    }
-                }, {onlyOnce: true});
-            }, 5000);
+                    }, {onlyOnce: true});
+                }, 5000);
+            }
         };
 
-        // ແກ້ໄຂຟັງຊັນ Reset ໃຫ້ລ້າງຄ່າໃນ Firebase ຢ່າງສົມບູນ
         window.resetGame = () => {
-            set(gameRef, { 
-                called: [0], // ໃສ່ 0 ເພື່ອໃຫ້ Array ບໍ່ຫວ່າງເປົ່າຈົນເກີນໄປໃນ Firebase
-                winner: null, 
-                latest: null 
-            });
+            set(gameRef, { called: [0], winner: null, latest: null });
+            clearInterval(autoInterval);
+            autoInterval = null;
         };
 
         onValue(gameRef, (snap) => {
             const data = snap.val();
             if(!data) return;
-
-            // ລ້າງຄ່າໜ້າຈໍຖ້າຫາກຂໍ້ມູນໃນ Firebase ຖືກ Reset
-            if (data.winner === null) {
-                document.getElementById('status-display').innerText = "ລໍຖ້າເລີ່ມ...";
-                document.getElementById('called-numbers').innerText = "";
-                // ຖ້າຫາກຍັງຢູ່ໃນເກມ ໃຫ້ສຸ່ມບັດໃໝ່ທຸກຄັ້ງທີ່ Reset
-                if(document.getElementById('game-area').style.display === 'block') generateBoard();
+            document.getElementById('called-numbers').innerText = (data.called || []).filter(x => x !== 0).join(', ');
+            
+            if(data.winner) {
+                document.getElementById('status-display').innerHTML = `🎉 Winner: ${data.winner}`;
+                clearInterval(autoInterval);
+            } else if(data.latest) {
+                document.getElementById('status-display').innerText = "ເລກຫຼ້າສຸດ: " + data.latest;
+                let msg = new SpeechSynthesisUtterance("ໝາຍເລກ " + data.latest);
+                msg.lang = 'th-TH';
+                window.speechSynthesis.speak(msg);
             } else {
-                document.getElementById('called-numbers').innerText = (data.called || []).filter(x => x !== 0).join(', ');
-                if(data.winner) {
-                    document.getElementById('status-display').innerHTML = `🎉 ຜູ້ຊະນະຄື: ${data.winner}`;
-                    clearInterval(autoInterval);
-                } else if(data.latest) {
-                    document.getElementById('status-display').innerText = "ເລກຫຼ້າສຸດ: " + data.latest;
-                    let msg = new SpeechSynthesisUtterance(data.latest.toString());
-                    msg.lang = 'th-TH';
-                    window.speechSynthesis.speak(msg);
-                }
+                document.getElementById('status-display').innerText = "ລໍຖ້າເລີ່ມ...";
             }
         });
 
