@@ -1,46 +1,123 @@
 <!DOCTYPE html>
-<html>
+<html lang="lo">
 <head>
-    <title>BINGO X JENNIE</title>
-    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-database-compat.js"></script>
+    <meta charset="UTF-8">
+    <title>🎰 BINGO REALTIME 🎰</title>
     <style>
-        body { background: white; font-family: sans-serif; text-align: center; color: black; }
-        .grid { display: grid; grid-template-columns: repeat(5, 50px); gap: 5px; justify-content: center; }
-        .cell { width: 50px; height: 50px; border: 2px solid red; display: flex; align-items: center; justify-content: center; font-weight: bold; cursor: pointer; }
-        .marked { background: red; color: white; }
+        body { font-family: sans-serif; background: #f0f2f5; text-align: center; padding: 20px; }
+        .container { max-width: 500px; margin: auto; background: white; padding: 20px; border-radius: 15px; }
+        .grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 5px; margin-top: 15px; }
+        .cell { aspect-ratio: 1; background: #e4e6eb; border: none; border-radius: 5px; font-weight: bold; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+        .cell.selected { background: #ff4757; color: white; }
+        .cell.free { background: #ffa502; color: white; }
+        button.btn { background: #2ed573; color: white; padding: 12px; border: none; border-radius: 5px; width: 100%; margin-top: 10px; font-weight: bold; cursor: pointer; }
+        input { padding: 10px; width: 80%; border-radius: 5px; border: 1px solid #ddd; margin-bottom: 10px; }
     </style>
 </head>
 <body>
-    <h1>BINGO X JENNIE</h1>
-    <input id="name" placeholder="ໃສ່ຊື່">
-    <button onclick="join()">ເຂົ້າເກມ</button>
-    <div id="board" class="grid" style="margin-top: 20px;"></div>
+<div class="container">
+    <h1>🎰 BINGO 🎰</h1>
+    
+    <div id="setup-area">
+        <input type="text" id="player-name" placeholder="ໃສ່ຊື່ຂອງທ່ານ..." required>
+        <button class="btn" onclick="startGame()">ເລີ່ມຫຼິ້ນ</button>
+    </div>
+    
+    <div id="game-area" style="display: none;">
+        <button class="btn" style="background:#ff4757;" onclick="initAudio()">🔊 ກົດປຸ່ມເປີດສຽງ</button>
+        <div id="room-status" style="font-weight:bold; margin-top:10px;">ລໍຖ້າເລີ່ມ...</div>
+        <div id="host-controls" style="display:none; margin-top:15px;">
+            <button class="btn" style="background:#1e90ff;" onclick="toggleAuto()">▶️ ເລີ່ມ/ຢຸດ ອໍໂຕ້ (5s)</button>
+            <button class="btn" style="background:#ff9f43;" onclick="resetGame()">🔄 ລ້າງກະດານ</button>
+        </div>
+        <div class="grid" id="bingo-board"></div>
+        <p><strong>ເລກທີ່ອອກແລ້ວ:</strong> <span id="number-list"></span></p>
+    </div>
+</div>
 
-    <script>
-        const firebaseConfig = {
-            // ເອົາ Config ຈາກ Firebase ມາໃສ່ບ່ອນນີ້ (apiKey, projectId, etc.)
-        };
-        firebase.initializeApp(firebaseConfig);
-        const db = firebase.database();
+<script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+    import { getDatabase, ref, set, onValue, update } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
 
-        function join() {
-            const name = document.getElementById('name').value;
-            if(!name) return alert("ໃສ່ຊື່ກ່ອນ");
-            renderBoard();
+    const firebaseConfig = { apiKey: "AIzaSyBOW0m7tdZl95srB6Mh2AcxNp9GQkTITrl", databaseURL: "https://bingoxjennie-default-rtdb.asia-southeast1.firebasedatabase.app", projectId: "bingoxjennie" };
+    const db = getDatabase(initializeApp(firebaseConfig));
+    const gameRef = ref(db, 'game_room');
+
+    let myBoard = [], autoInterval = null, pName = "";
+
+    window.startGame = () => {
+        const inputName = document.getElementById('player-name').value;
+        if(!inputName) { alert("ກະລຸນາໃສ່ຊື່ກ່ອນ!"); return; }
+        pName = inputName;
+        // ບັງຄັບເປີດໜ້າເກມ
+        document.getElementById('setup-area').style.display = 'none';
+        document.getElementById('game-area').style.display = 'block';
+        generateBoard();
+    };
+
+    function speak(text, force = false) {
+        if (force) window.speechSynthesis.cancel();
+        const msg = new SpeechSynthesisUtterance(text);
+        msg.lang = 'th-TH';
+        window.speechSynthesis.speak(msg);
+    }
+
+    function generateBoard() {
+        let nums = Array.from({length: 75}, (_, i) => i + 1).sort(() => Math.random() - 0.5).slice(0, 25);
+        nums[12] = "FREE"; myBoard = nums;
+        const board = document.getElementById('bingo-board'); board.innerHTML = "";
+        nums.forEach((n, i) => {
+            const btn = document.createElement('button');
+            btn.className = "cell" + (n === "FREE" ? " free" : "");
+            btn.innerText = n === "FREE" ? "⭐" : n;
+            btn.id = "c" + i;
+            btn.onclick = () => {
+                const called = document.getElementById('number-list').innerText.split(', ').filter(x => x !== "").map(Number);
+                if (n !== "FREE" && !called.includes(n)) { alert("ເລກນີ້ຍັງບໍ່ທັນອອກ!"); return; }
+                btn.classList.add('selected');
+                if (checkWin()) update(gameRef, { winner: "🎉 ບິງໂກ! ຜູ້ຊະນະຄື: " + pName });
+            };
+            board.appendChild(btn);
+        });
+    }
+
+    function checkWin() {
+        let cells = Array.from(document.querySelectorAll('.cell'));
+        let matrix = []; for(let i=0; i<5; i++) matrix.push(cells.slice(i*5, i*5+5).map(el => el.classList.contains('selected')));
+        for(let i=0; i<5; i++) { if(matrix[i].every(v => v) || matrix.map(r => r[i]).every(v => v)) return true; }
+        return [0,1,2,3,4].every(i => matrix[i][i]) || [0,1,2,3,4].every(i => matrix[i][4-i]);
+    }
+
+    window.toggleAuto = () => {
+        if(autoInterval) { clearInterval(autoInterval); autoInterval = null; }
+        else autoInterval = setInterval(() => {
+            let called = document.getElementById('number-list').innerText.split(', ').filter(x => x !== "").map(Number);
+            let avail = Array.from({length: 75}, (_, i) => i + 1).filter(n => !called.includes(n));
+            if(avail.length > 0) update(gameRef, { called: [...called, avail[Math.floor(Math.random() * avail.length)]], latest: avail[0] });
+        }, 5000);
+    };
+
+    window.resetGame = () => {
+        set(gameRef, { called: [], latest: "", winner: null });
+        window.speechSynthesis.cancel();
+        generateBoard();
+        document.getElementById('room-status').innerText = "ລໍຖ້າເລີ່ມ...";
+    };
+
+    onValue(gameRef, (snap) => {
+        const data = snap.val(); if(!data) return;
+        document.getElementById('number-list').innerText = (data.called || []).join(', ');
+        if(data.winner) {
+            document.getElementById('room-status').innerHTML = "<h2 style='color:red;'>" + data.winner + "</h2>";
+            clearInterval(autoInterval); autoInterval = null;
+            speak("ບິງໂກ! ຜູ້ຊະນະຄື " + data.winner.split(': ')[1], true);
+        } else if(data.latest) {
+            document.getElementById('room-status').innerText = "ເລກຫຼ້າສຸດ: " + data.latest;
+            speak("ໝາຍເລກ " + data.latest);
         }
+    });
 
-        function renderBoard() {
-            const board = document.getElementById('board');
-            board.innerHTML = "";
-            for(let i=0; i<25; i++) {
-                const cell = document.createElement('div');
-                cell.className = 'cell';
-                cell.innerText = Math.floor(Math.random() * 75) + 1;
-                cell.onclick = function() { this.classList.toggle('marked'); };
-                board.appendChild(cell);
-            }
-        }
-    </script>
+    if((new URLSearchParams(window.location.search)).get('host') === 'true') document.getElementById('host-controls').style.display = 'block';
+</script>
 </body>
 </html>
