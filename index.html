@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>BINGO X JENNIE</title>
     <style>
-        body { font-family: 'Arial', sans-serif; background: #f0f2f5; text-align: center; padding: 20px; }
+        body { font-family: sans-serif; background: #f0f2f5; text-align: center; padding: 20px; }
         .container { max-width: 500px; margin: auto; background: white; padding: 20px; border-radius: 15px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
         h1 { color: #ff0000; }
         .grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 5px; margin-top: 15px; }
@@ -13,7 +13,7 @@
         .cell.selected { background: #ff0000; color: white; }
         .cell.free { background: #ffd700; color: black; }
         button.btn { background: #ff0000; color: white; padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer; margin-top: 10px; width: 100%; }
-        #called-numbers { font-weight: bold; color: #555; word-wrap: break-word; }
+        #called-list-box { margin-top: 15px; padding: 10px; background: #eee; border-radius: 5px; min-height: 50px; }
     </style>
 </head>
 <body>
@@ -25,13 +25,16 @@
         </div>
 
         <div id="game-area" style="display:none;">
-            <div id="status-display" style="font-weight:bold; font-size:1.2em; color:red;">ລໍຖ້າເລີ່ມ...</div>
+            <div id="status-display" style="font-weight:bold; font-size:1.5em; color:red;">ລໍຖ້າເລີ່ມ...</div>
             <div id="host-controls" style="display:none;">
-                <button class="btn" onclick="toggleAuto()">▶️ ເລີ່ມ/ຢຸດ ອໍໂຕ້</button>
+                <button class="btn" onclick="toggleAuto()">▶️ ເລີ່ມ/ຢຸດ ອໍໂຕ້ (5s)</button>
                 <button class="btn" onclick="resetGame()">🔄 ເລີ່ມເກມໃໝ່</button>
             </div>
             <div class="grid" id="bingo-board"></div>
-            <p>ເລກທີ່ອອກ: <span id="called-numbers"></span></p>
+            <div id="called-list-box">
+                <strong>ເລກທີ່ອອກແລ້ວ:</strong><br>
+                <span id="called-numbers" style="font-size: 1.2em; color: #333;"></span>
+            </div>
         </div>
     </div>
 
@@ -45,7 +48,7 @@
         let pName = "";
         window.startGame = () => {
             pName = document.getElementById('player-name').value;
-            if(!pName) return alert("ໃສ່ຊື່ກ່ອນ!");
+            if(!pName) return alert("ກະລຸນາໃສ່ຊື່ກ່ອນ!");
             document.getElementById('setup-area').style.display = 'none';
             document.getElementById('game-area').style.display = 'block';
             generateBoard();
@@ -65,9 +68,7 @@
                     if (n === "FREE" || called.includes(n.toString())) {
                         div.classList.add('selected');
                         if (checkWin()) update(gameRef, { winner: pName });
-                    } else {
-                        alert("ເລກນີ້ຍັງບໍ່ທັນອອກ!");
-                    }
+                    } else { alert("ເລກນີ້ຍັງບໍ່ທັນອອກ!"); }
                 };
                 board.appendChild(div);
             });
@@ -84,10 +85,14 @@
         window.toggleAuto = () => {
             if(autoInterval) { clearInterval(autoInterval); autoInterval = null; }
             else autoInterval = setInterval(() => {
-                let n = Math.floor(Math.random() * 75) + 1;
                 onValue(gameRef, (snap) => {
-                    let called = snap.val()?.called || [];
-                    if(!called.includes(n)) update(gameRef, { called: [...called, n], latest: n });
+                    const data = snap.val() || { called: [] };
+                    let called = data.called || [];
+                    let available = Array.from({length: 75}, (_, i) => i + 1).filter(n => !called.includes(n));
+                    if(available.length > 0) {
+                        let n = available[Math.floor(Math.random() * available.length)];
+                        update(gameRef, { called: [...called, n], latest: n });
+                    }
                 }, {onlyOnce: true});
             }, 5000);
         };
@@ -103,7 +108,7 @@
                 clearInterval(autoInterval);
             } else if(data.latest) {
                 document.getElementById('status-display').innerText = "ເລກຫຼ້າສຸດ: " + data.latest;
-                window.speechSynthesis.speak(new SpeechSynthesisUtterance(data.latest.toString()));
+                window.speechSynthesis.speak(new SpeechSynthesisUtterance("ໝາຍເລກ " + data.latest));
             }
         });
 
