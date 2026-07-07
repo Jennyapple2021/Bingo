@@ -5,26 +5,27 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>BINGO X JENNIE</title>
     <style>
-        body { font-family: sans-serif; background: #f0f2f5; text-align: center; padding: 20px; }
-        .container { max-width: 500px; margin: auto; background: white; padding: 20px; border-radius: 15px; }
+        body { font-family: 'Arial', sans-serif; background: #ffffff; text-align: center; padding: 20px; }
+        .container { max-width: 500px; margin: auto; background: white; padding: 20px; border-radius: 15px; border: 2px solid #4cd137; }
+        h1 { color: #4cd137; font-weight: bold; }
         .grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 5px; margin-top: 15px; }
-        .cell { aspect-ratio: 1; border: 1px solid #ccc; display: flex; align-items: center; justify-content: center; font-weight: bold; cursor: pointer; background: #fff; }
-        .cell.selected { background: #ff4757; color: white; }
-        .cell.free { background: #ffa502; color: black; }
-        button.btn { background: #ff4757; color: white; padding: 12px; border: none; border-radius: 5px; width: 100%; margin-top: 10px; cursor: pointer; }
+        .cell { aspect-ratio: 1; border: 2px solid #4cd137; display: flex; align-items: center; justify-content: center; font-weight: bold; cursor: pointer; background: #fff; color: #000; font-size: 1.2em; }
+        .cell.selected { background: #ff4757 !important; color: white !important; }
+        .cell.free { background: #4cd137 !important; color: white !important; font-size: 0.8em; }
+        button.btn { background: #4cd137; color: white; padding: 12px; border: none; border-radius: 5px; width: 100%; margin-top: 10px; cursor: pointer; font-weight: bold; }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>BINGO X JENNIE</h1>
+        <h1>BINGO</h1>
         <div id="setup-area">
-            <input type="text" id="player-name" placeholder="ໃສ່ຊື່..." style="padding:10px; width:80%;">
+            <input type="text" id="player-name" placeholder="ໃສ່ຊື່ຂອງທ່ານ..." style="padding:10px; width:80%;">
             <button class="btn" onclick="startGame()">ເຂົ້າຮ່ວມເກມ</button>
         </div>
 
         <div id="game-area" style="display:none;">
-            <button class="btn" onclick="initAudio()">🔊 ເປີດສຽງ (ກົດກ່ອນຫຼິ້ນ)</button>
-            <div id="status-display" style="font-weight:bold; margin-top:15px; color:red;">ລໍຖ້າເລີ່ມ...</div>
+            <button class="btn" onclick="initAudio()">🔊 ເປີດສຽງ</button>
+            <div id="status-display" style="font-weight:bold; margin-top:15px; color:#ff4757;">ລໍຖ້າເລີ່ມ...</div>
             <div id="host-controls" style="display:none;">
                 <button class="btn" onclick="toggleAuto()">▶️ ເລີ່ມ/ຢຸດ ອໍໂຕ້</button>
                 <button class="btn" onclick="resetGame()">🔄 ເລີ່ມເກມໃໝ່</button>
@@ -54,14 +55,23 @@
         };
 
         function generateBoard() {
-            let nums = Array.from({length: 75}, (_, i) => i + 1).sort(() => Math.random() - 0.5).slice(0, 25);
-            nums[12] = "FREE";
+            // ສ້າງເລກຕາມຖັນ BINGO: B(1-15), I(16-30), N(31-45), G(46-60), O(61-75)
+            const getCol = (min, max) => {
+                let arr = Array.from({length: max - min + 1}, (_, i) => i + min);
+                return arr.sort(() => Math.random() - 0.5).slice(0, 5);
+            };
+            
+            let b = getCol(1, 15), i = getCol(16, 30), n = getCol(31, 45), g = getCol(46, 60), o = getCol(61, 75);
+            let boardArr = [];
+            for(let j=0; j<5; j++) { boardArr.push(b[j], i[j], n[j], g[j], o[j]); }
+            boardArr[12] = "FREE";
+
             const board = document.getElementById('bingo-board');
             board.innerHTML = "";
-            nums.forEach((n) => {
+            boardArr.forEach((n) => {
                 const div = document.createElement('div');
                 div.className = "cell" + (n === "FREE" ? " free selected" : "");
-                div.innerText = n === "FREE" ? "★" : n;
+                div.innerText = n === "FREE" ? "FREE" : n;
                 div.onclick = () => {
                     const called = document.getElementById('called-numbers').innerText.split(', ');
                     if (n === "FREE" || called.includes(n.toString())) {
@@ -97,37 +107,22 @@
             }, 5000);
         };
 
-        // ແກ້ໄຂ: ໃຊ້ Date.now() ເພື່ອສ້າງຄ່າ Reset ໃໝ່ສະເໝີ 
-        // ປ້ອງກັນບັນຫາ Firebase Cache ບໍ່ຍອມລ້າງ
         window.resetGame = () => {
-            set(gameRef, { 
-                called: [0], 
-                winner: null, 
-                latest: null,
-                resetTrigger: Date.now() 
-            });
+            set(gameRef, { called: [0], winner: null, latest: null, resetTrigger: Date.now() });
         };
 
         onValue(gameRef, (snap) => {
             const data = snap.val();
             if(!data) return;
-
-            // ຖ້າຫາກມີການ resetTrigger ປ່ຽນແປງ ໃຫ້ສັ່ງລ້າງໜ້າຈໍ ແລະ ສຸ່ມກະດານໃໝ່ທັນທີ
             if(data.resetTrigger) {
-                document.getElementById('status-display').innerText = "ເລີ່ມເກມໃໝ່!";
-                document.getElementById('called-numbers').innerText = "";
-                if(document.getElementById('game-area').style.display === 'block') {
-                    generateBoard();
-                }
-                // ຫຼັງຈາກ generate ໃໝ່ແລ້ວ ໃຫ້ລ້າງ trigger ອອກ
+                generateBoard();
                 update(gameRef, { resetTrigger: null });
             }
-
+            document.getElementById('called-numbers').innerText = (data.called || []).filter(x => x !== 0).join(', ');
             if(data.winner) {
                 document.getElementById('status-display').innerHTML = `🎉 ຜູ້ຊະນະຄື: ${data.winner}`;
                 clearInterval(autoInterval);
             } else if(data.latest) {
-                document.getElementById('called-numbers').innerText = (data.called || []).filter(x => x !== 0).join(', ');
                 document.getElementById('status-display').innerText = "ເລກຫຼ້າສຸດ: " + data.latest;
                 let msg = new SpeechSynthesisUtterance(data.latest.toString());
                 msg.lang = 'th-TH';
