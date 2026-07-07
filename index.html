@@ -13,35 +13,29 @@
         .cell.selected { background: #ff4757 !important; color: white !important; }
         .cell.free { background: #4cd137 !important; color: white !important; font-size: 0.8em; }
         
-        /* ປຸ່ມທົ່ວໄປ */
         button.btn { background: #4cd137; color: white; padding: 12px; border: none; border-radius: 5px; width: 100%; margin-top: 10px; cursor: pointer; font-weight: bold; }
-        
-        /* ສີສະເພາະສຳລັບ Host */
         #host-controls { background: #fff9c4; padding: 15px; border-radius: 10px; border: 2px dashed #f1c40f; margin-top: 15px; }
         #host-controls button { background: #f39c12; }
-        #host-controls button:hover { background: #d35400; }
     </style>
 </head>
 <body>
     <div class="container">
         <h1>BINGO</h1>
         <div id="setup-area">
-            <input type="text" id="player-name" placeholder="ໃສ່ຊື່ຂອງທ່ານ..." style="padding:10px; width:80%; border: 1px solid #ccc; border-radius: 5px;">
+            <input type="text" id="player-name" placeholder="ໃສ່ຊື່..." style="padding:10px; width:80%; border: 1px solid #ccc; border-radius: 5px;">
             <button class="btn" onclick="startGame()">ເຂົ້າຮ່ວມເກມ</button>
         </div>
 
         <div id="game-area" style="display:none;">
-            <button class="btn" onclick="initAudio()">🔊 ເປີດສຽງ (ກົດກ່ອນເລີ່ມ)</button>
-            <div id="status-display" style="font-weight:bold; margin-top:15px; color:#ff4757; font-size: 1.5em;">ລໍຖ້າເລີ່ມ...</div>
-            
+            <button class="btn" onclick="initAudio()">🔊 ເປີດສຽງ</button>
+            <div id="status-display" style="font-weight:bold; margin-top:15px; color:#ff4757;">ລໍຖ້າເລີ່ມ...</div>
             <div id="host-controls" style="display:none;">
                 <h3 style="color:#d35400; margin-top:0;">🎮 ແຜງຄວບຄຸມ (Host)</h3>
                 <button class="btn" onclick="toggleAuto()">▶️ ເລີ່ມ/ຢຸດ ອໍໂຕ້</button>
                 <button class="btn" onclick="resetGame()">🔄 ເລີ່ມເກມໃໝ່</button>
             </div>
-
             <div class="grid" id="bingo-board"></div>
-            <p>ເລກທີ່ອອກແລ້ວ: <br><span id="called-numbers" style="word-break: break-all; color: #555;"></span></p>
+            <p>ເລກທີ່ອອກແລ້ວ:<br><span id="called-numbers" style="word-break: break-all; color: #555;"></span></p>
         </div>
     </div>
 
@@ -65,9 +59,14 @@
         };
 
         function generateBoard() {
+            // ສ້າງເລກຕາມຖັນ: ແລ້ວ Sort ຈາກນ້ອຍຫາໃຫຍ່
             const getCol = (min, max) => {
-                let arr = Array.from({length: max - min + 1}, (_, i) => i + min);
-                return arr.sort(() => Math.random() - 0.5).slice(0, 5);
+                let arr = [];
+                while(arr.length < 5){
+                    let r = Math.floor(Math.random() * (max - min + 1)) + min;
+                    if(arr.indexOf(r) === -1) arr.push(r);
+                }
+                return arr.sort((a, b) => a - b);
             };
             
             let b = getCol(1, 15), i = getCol(16, 30), n = getCol(31, 45), g = getCol(46, 60), o = getCol(61, 75);
