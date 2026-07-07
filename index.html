@@ -7,31 +7,7 @@
 
         let pName = "", autoInterval = null;
 
-               onValue(gameRef, (snap) => {
-            const data = snap.val();
-            if(!data) return;
-            if(data.resetTrigger) {
-                document.getElementById('called-numbers').innerText = "";
-                generateBoard();
-                update(gameRef, { resetTrigger: null });
-            }
-            if(data.winner) {
-                document.getElementById('status-display').innerText = `🎉 ຊະນະໂດຍ: ${data.winner}`;
-                // ໃຊ້ການສັ່ງສຽງໂດຍກົງ
-                let msg = new SpeechSynthesisUtterance("ມີຜູ້ຊະນະແລ້ວ");
-                msg.lang = 'th-TH';
-                window.speechSynthesis.speak(msg);
-            } else if(data.latest) {
-                document.getElementById('called-numbers').innerText = (data.called || []).filter(x => x !== 0).join(', ');
-                document.getElementById('status-display').innerText = "ເລກຫຼ້າສຸດ: " + data.latest;
-                
-                // ວິທີແກ້ໄຂ: ບັງຄັບໃຫ້ອ່ານເລກໃໝ່
-                let msg = new SpeechSynthesisUtterance(data.latest.toString());
-                msg.lang = 'th-TH';
-                window.speechSynthesis.speak(msg);
-            }
-        });
- // ເພີ່ມຟັງຊັນສຳລັບອ່ານສຽງ
+        // ເພີ່ມຟັງຊັນສຳລັບອ່ານສຽງ
         window.speakNumber = (text) => {
             const msg = new SpeechSynthesisUtterance(text);
             msg.lang = 'th-TH'; // ຕັ້ງເປັນພາສາໄທ
