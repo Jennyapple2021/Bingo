@@ -23,7 +23,7 @@
         </div>
 
         <div id="game-area" style="display:none;">
-            <button class="btn" onclick="initAudio()">🔊 ກົດປຸ່ມນີ້ເພື່ອເປີດສຽງ</button>
+            <button class="btn" onclick="initAudio()">🔊 ກົດປຸ່ມເປີດສຽງ</button>
             <div id="status-display" style="font-weight:bold; margin-top:15px; color:red;">ລໍຖ້າເລີ່ມ...</div>
             <div id="host-controls" style="display:none;">
                 <button class="btn" onclick="toggleAuto()">▶️ ເລີ່ມ/ຢຸດ ອໍໂຕ້</button>
@@ -43,10 +43,7 @@
 
         let pName = "", autoInterval = null;
 
-        window.initAudio = () => {
-            window.speechSynthesis.speak(new SpeechSynthesisUtterance("ເປີດສຽງແລ້ວ"));
-            alert("ເປີດສຽງແລ້ວ! ພ້ອມຫຼິ້ນ");
-        };
+        window.initAudio = () => { window.speechSynthesis.speak(new SpeechSynthesisUtterance("ເປີດສຽງແລ້ວ")); };
 
         window.startGame = () => {
             pName = document.getElementById('player-name').value;
@@ -70,7 +67,7 @@
                     if (n === "FREE" || called.includes(n.toString())) {
                         div.classList.add('selected');
                         if (checkWin()) update(gameRef, { winner: pName });
-                    } else { alert("ເລກນີ້ຍັງບໍ່ທັນອອກ!"); }
+                    }
                 };
                 board.appendChild(div);
             });
@@ -87,32 +84,43 @@
             if(autoInterval) { clearInterval(autoInterval); autoInterval = null; }
             else autoInterval = setInterval(() => {
                 onValue(gameRef, (snap) => {
-                    let called = snap.val()?.called || [];
-                    let available = Array.from({length: 75}, (_, i) => i + 1).filter(n => !called.includes(n));
-                    if(available.length > 0) {
-                        let n = available[Math.floor(Math.random() * available.length)];
-                        update(gameRef, { called: [...called, n], latest: n });
+                    let d = snap.val();
+                    if(d && !d.winner) {
+                        let called = d.called || [];
+                        let available = Array.from({length: 75}, (_, i) => i + 1).filter(n => !called.includes(n));
+                        if(available.length > 0) {
+                            let n = available[Math.floor(Math.random() * available.length)];
+                            update(gameRef, { called: [...called, n], latest: n });
+                        }
                     }
                 }, {onlyOnce: true});
             }, 5000);
         };
 
         window.resetGame = () => {
+            // ສັ່ງລ້າງຂໍ້ມູນໃນ Firebase ໃຫ້ກາຍເປັນຄ່າຫວ່າງທັງໝົດ
             set(gameRef, { called: [], winner: null, latest: null });
-            generateBoard();
         };
 
         onValue(gameRef, (snap) => {
             const data = snap.val();
             if(!data) return;
+            
+            // ຖ້າຂໍ້ມູນຖືກລ້າງ (Reset) ໃຫ້ທຸກຄົນສຸ່ມບັດໃໝ່ທັນທີ
+            if(data.called.length === 0 && data.winner === null) {
+                document.getElementById('status-display').innerText = "ເກມເລີ່ມໃໝ່ແລ້ວ!";
+                generateBoard();
+            }
+
             document.getElementById('called-numbers').innerText = (data.called || []).join(', ');
+            
             if(data.winner) {
-                document.getElementById('status-display').innerHTML = `🎉 Winner: ${data.winner}`;
+                document.getElementById('status-display').innerHTML = `🎉 ຜູ້ຊະນະຄື: ${data.winner}`;
                 clearInterval(autoInterval);
             } else if(data.latest) {
                 document.getElementById('status-display').innerText = "ເລກຫຼ້າສຸດ: " + data.latest;
                 let msg = new SpeechSynthesisUtterance(data.latest.toString());
-                msg.lang = 'th-TH'; // ໃຊ້ພາສາໄທເພື່ອອ່ານຕົວເລກ
+                msg.lang = 'th-TH';
                 window.speechSynthesis.speak(msg);
             }
         });
