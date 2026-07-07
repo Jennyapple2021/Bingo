@@ -6,35 +6,31 @@
     <title>BINGO X JENNIE</title>
     <style>
         body { font-family: sans-serif; background: #f0f2f5; text-align: center; padding: 20px; }
-        .container { max-width: 500px; margin: auto; background: white; padding: 20px; border-radius: 15px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
-        h1 { color: #ff0000; }
+        .container { max-width: 500px; margin: auto; background: white; padding: 20px; border-radius: 15px; }
         .grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 5px; margin-top: 15px; }
         .cell { aspect-ratio: 1; border: 1px solid #ccc; display: flex; align-items: center; justify-content: center; font-weight: bold; cursor: pointer; background: #fff; }
-        .cell.selected { background: #ff0000; color: white; }
-        .cell.free { background: #ffd700; color: black; }
-        button.btn { background: #ff0000; color: white; padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer; margin-top: 10px; width: 100%; }
-        #called-list-box { margin-top: 15px; padding: 10px; background: #eee; border-radius: 5px; min-height: 50px; }
+        .cell.selected { background: #ff4757; color: white; }
+        .cell.free { background: #ffa502; color: black; }
+        button.btn { background: #ff4757; color: white; padding: 12px; border: none; border-radius: 5px; width: 100%; margin-top: 10px; cursor: pointer; }
     </style>
 </head>
 <body>
     <div class="container">
         <h1>BINGO X JENNIE</h1>
         <div id="setup-area">
-            <input type="text" id="player-name" placeholder="ໃສ່ຊື່ຂອງທ່ານ..." style="padding:10px; width:80%;">
+            <input type="text" id="player-name" placeholder="ໃສ່ຊື່..." style="padding:10px; width:80%;">
             <button class="btn" onclick="startGame()">ເຂົ້າຮ່ວມເກມ</button>
         </div>
 
         <div id="game-area" style="display:none;">
-            <div id="status-display" style="font-weight:bold; font-size:1.5em; color:red;">ລໍຖ້າເລີ່ມ...</div>
+            <button class="btn" onclick="initAudio()">🔊 ກົດປຸ່ມນີ້ເພື່ອເປີດສຽງ</button>
+            <div id="status-display" style="font-weight:bold; margin-top:15px; color:red;">ລໍຖ້າເລີ່ມ...</div>
             <div id="host-controls" style="display:none;">
-                <button class="btn" onclick="toggleAuto()">▶️ ເລີ່ມ/ຢຸດ ອໍໂຕ້ (5s)</button>
+                <button class="btn" onclick="toggleAuto()">▶️ ເລີ່ມ/ຢຸດ ອໍໂຕ້</button>
                 <button class="btn" onclick="resetGame()">🔄 ເລີ່ມເກມໃໝ່</button>
             </div>
             <div class="grid" id="bingo-board"></div>
-            <div id="called-list-box">
-                <strong>ເລກທີ່ອອກແລ້ວ:</strong><br>
-                <span id="called-numbers" style="font-size: 1.2em; color: #333;"></span>
-            </div>
+            <p>ເລກທີ່ອອກ: <span id="called-numbers"></span></p>
         </div>
     </div>
 
@@ -45,10 +41,16 @@
         const db = getDatabase(initializeApp({ apiKey: "AIzaSyBOW0m7tdZl95srB6Mh2AcxNp9GQkTITrl", databaseURL: "https://bingoxjennie-default-rtdb.asia-southeast1.firebasedatabase.app", projectId: "bingoxjennie" }));
         const gameRef = ref(db, 'game_room');
 
-        let pName = "";
+        let pName = "", autoInterval = null;
+
+        window.initAudio = () => {
+            window.speechSynthesis.speak(new SpeechSynthesisUtterance("ເປີດສຽງແລ້ວ"));
+            alert("ເປີດສຽງແລ້ວ! ພ້ອມຫຼິ້ນ");
+        };
+
         window.startGame = () => {
             pName = document.getElementById('player-name').value;
-            if(!pName) return alert("ກະລຸນາໃສ່ຊື່ກ່ອນ!");
+            if(!pName) return alert("ໃສ່ຊື່ກ່ອນ!");
             document.getElementById('setup-area').style.display = 'none';
             document.getElementById('game-area').style.display = 'block';
             generateBoard();
@@ -81,13 +83,11 @@
             return [0,1,2,3,4].every(i => m[i][i]) || [0,1,2,3,4].every(i => m[i][4-i]);
         }
 
-        let autoInterval = null;
         window.toggleAuto = () => {
             if(autoInterval) { clearInterval(autoInterval); autoInterval = null; }
             else autoInterval = setInterval(() => {
                 onValue(gameRef, (snap) => {
-                    const data = snap.val() || { called: [] };
-                    let called = data.called || [];
+                    let called = snap.val()?.called || [];
                     let available = Array.from({length: 75}, (_, i) => i + 1).filter(n => !called.includes(n));
                     if(available.length > 0) {
                         let n = available[Math.floor(Math.random() * available.length)];
@@ -97,7 +97,10 @@
             }, 5000);
         };
 
-        window.resetGame = () => set(gameRef, { called: [], winner: null, latest: null });
+        window.resetGame = () => {
+            set(gameRef, { called: [], winner: null, latest: null });
+            generateBoard();
+        };
 
         onValue(gameRef, (snap) => {
             const data = snap.val();
@@ -108,7 +111,9 @@
                 clearInterval(autoInterval);
             } else if(data.latest) {
                 document.getElementById('status-display').innerText = "ເລກຫຼ້າສຸດ: " + data.latest;
-                window.speechSynthesis.speak(new SpeechSynthesisUtterance("ໝາຍເລກ " + data.latest));
+                let msg = new SpeechSynthesisUtterance(data.latest.toString());
+                msg.lang = 'th-TH'; // ໃຊ້ພາສາໄທເພື່ອອ່ານຕົວເລກ
+                window.speechSynthesis.speak(msg);
             }
         });
 
