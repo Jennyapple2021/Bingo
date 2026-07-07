@@ -18,12 +18,12 @@
     <div class="container">
         <h1>BINGO X JENNIE</h1>
         <div id="setup-area">
-            <input type="text" id="player-name" placeholder="ໃສ່ຊື່ຂອງທ່ານ..." style="padding:10px; width:80%;">
+            <input type="text" id="player-name" placeholder="ໃສ່ຊື່..." style="padding:10px; width:80%;">
             <button class="btn" onclick="startGame()">ເຂົ້າຮ່ວມເກມ</button>
         </div>
 
         <div id="game-area" style="display:none;">
-            <button class="btn" onclick="unlockAudio()">🔊 ເປີດສຽງ (ກົດກ່ອນເລີ່ມ)</button>
+            <button class="btn" onclick="initAudio()">🔊 ເປີດສຽງ (ກົດກ່ອນຫຼິ້ນ)</button>
             <div id="status-display" style="font-weight:bold; margin-top:15px; color:red;">ລໍຖ້າເລີ່ມ...</div>
             <div id="host-controls" style="display:none;">
                 <button class="btn" onclick="toggleAuto()">▶️ ເລີ່ມ/ຢຸດ ອໍໂຕ້</button>
@@ -43,12 +43,7 @@
 
         let pName = "", autoInterval = null;
 
-        window.unlockAudio = () => {
-            const msg = new SpeechSynthesisUtterance("ພ້ອມຫຼິ້ນແລ້ວ");
-            msg.lang = 'th-TH';
-            window.speechSynthesis.speak(msg);
-            alert("ເປີດສຽງສຳເລັດ!");
-        };
+        window.initAudio = () => { window.speechSynthesis.speak(new SpeechSynthesisUtterance("ເປີດສຽງແລ້ວ")); };
 
         window.startGame = () => {
             pName = document.getElementById('player-name').value;
@@ -72,7 +67,7 @@
                     if (n === "FREE" || called.includes(n.toString())) {
                         div.classList.add('selected');
                         if (checkWin()) update(gameRef, { winner: pName });
-                    } else { alert("ເລກນີ້ຍັງບໍ່ທັນອອກ!"); }
+                    }
                 };
                 board.appendChild(div);
             });
@@ -86,48 +81,55 @@
         }
 
         window.toggleAuto = () => {
-            if(autoInterval) { clearInterval(autoInterval); autoInterval = null; alert("ຢຸດອໍໂຕ້"); }
-            else {
-                autoInterval = setInterval(() => {
-                    onValue(gameRef, (snap) => {
-                        let d = snap.val() || {called: []};
-                        if(!d.winner) {
-                            let called = d.called || [];
-                            let available = Array.from({length: 75}, (_, i) => i + 1).filter(n => !called.includes(n));
-                            if(available.length > 0) {
-                                let n = available[Math.floor(Math.random() * available.length)];
-                                update(gameRef, { called: [...called, n], latest: n });
-                            }
+            if(autoInterval) { clearInterval(autoInterval); autoInterval = null; }
+            else autoInterval = setInterval(() => {
+                onValue(gameRef, (snap) => {
+                    let d = snap.val();
+                    if(d && !d.winner) {
+                        let called = d.called || [];
+                        let available = Array.from({length: 75}, (_, i) => i + 1).filter(n => !called.includes(n));
+                        if(available.length > 0) {
+                            let n = available[Math.floor(Math.random() * available.length)];
+                            update(gameRef, { called: [...called, n], latest: n });
                         }
-                    }, {onlyOnce: true});
-                }, 5000);
-            }
+                    }
+                }, {onlyOnce: true});
+            }, 5000);
         };
 
+        // ແກ້ໄຂ: ໃຊ້ Date.now() ເພື່ອສ້າງຄ່າ Reset ໃໝ່ສະເໝີ 
+        // ປ້ອງກັນບັນຫາ Firebase Cache ບໍ່ຍອມລ້າງ
         window.resetGame = () => {
-            set(gameRef, { called: [0], winner: null, latest: null });
+            set(gameRef, { 
+                called: [0], 
+                winner: null, 
+                latest: null,
+                resetTrigger: Date.now() 
+            });
         };
 
         onValue(gameRef, (snap) => {
             const data = snap.val();
             if(!data) return;
 
-            // ເມື່ອ reset ຫຼື ຍັງບໍ່ມີຜູ້ຊະນະ
-            if(data.winner === null) {
-                document.getElementById('status-display').innerText = "ລໍຖ້າເລີ່ມເກມ...";
-                if(data.called.length <= 1) { // ຖ້າຂໍ້ມູນຖືກລ້າງ
-                    document.getElementById('called-numbers').innerText = "";
-                    if(document.getElementById('game-area').style.display === 'block') generateBoard();
+            // ຖ້າຫາກມີການ resetTrigger ປ່ຽນແປງ ໃຫ້ສັ່ງລ້າງໜ້າຈໍ ແລະ ສຸ່ມກະດານໃໝ່ທັນທີ
+            if(data.resetTrigger) {
+                document.getElementById('status-display').innerText = "ເລີ່ມເກມໃໝ່!";
+                document.getElementById('called-numbers').innerText = "";
+                if(document.getElementById('game-area').style.display === 'block') {
+                    generateBoard();
                 }
-            } else {
-                document.getElementById('called-numbers').innerText = (data.called || []).filter(x => x !== 0).join(', ');
-                document.getElementById('status-display').innerHTML = `🎉 ຜູ້ຊະນະຄື: ${data.winner}`;
-                clearInterval(autoInterval);
+                // ຫຼັງຈາກ generate ໃໝ່ແລ້ວ ໃຫ້ລ້າງ trigger ອອກ
+                update(gameRef, { resetTrigger: null });
             }
 
-            if(data.latest && !data.winner) {
+            if(data.winner) {
+                document.getElementById('status-display').innerHTML = `🎉 ຜູ້ຊະນະຄື: ${data.winner}`;
+                clearInterval(autoInterval);
+            } else if(data.latest) {
+                document.getElementById('called-numbers').innerText = (data.called || []).filter(x => x !== 0).join(', ');
                 document.getElementById('status-display').innerText = "ເລກຫຼ້າສຸດ: " + data.latest;
-                let msg = new SpeechSynthesisUtterance("ໝາຍເລກ " + data.latest);
+                let msg = new SpeechSynthesisUtterance(data.latest.toString());
                 msg.lang = 'th-TH';
                 window.speechSynthesis.speak(msg);
             }
