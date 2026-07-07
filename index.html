@@ -3,126 +3,106 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>🎰 BINGO REALTIME 🎰</title>
+    <title>BINGO X JENNIE</title>
     <style>
-        body { font-family: sans-serif; background: #f0f2f5; text-align: center; padding: 20px; }
-        .container { max-width: 500px; margin: auto; background: white; padding: 20px; border-radius: 15px; }
+        body { font-family: 'Arial', sans-serif; background: #f0f2f5; text-align: center; padding: 20px; }
+        .container { max-width: 500px; margin: auto; background: white; padding: 20px; border-radius: 15px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
+        h1 { color: #ff0000; }
         .grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 5px; margin-top: 15px; }
-        .cell { aspect-ratio: 1; background: #e4e6eb; border: none; border-radius: 5px; font-weight: bold; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 1.2em; }
-        .cell.selected { background: #ff4757; color: white; }
-        .cell.free { background: #ffa502; color: white; }
-        button.btn { background: #2ed573; color: white; padding: 12px; border: none; border-radius: 5px; width: 100%; margin-top: 10px; font-weight: bold; cursor: pointer; }
-        input { padding: 10px; width: 80%; border-radius: 5px; border: 1px solid #ddd; margin-bottom: 10px; }
+        .cell { aspect-ratio: 1; border: 1px solid #ccc; display: flex; align-items: center; justify-content: center; font-weight: bold; cursor: pointer; }
+        .cell.selected { background: #ff0000; color: white; }
+        .cell.free { background: #ffd700; }
+        button.btn { background: #ff0000; color: white; padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer; margin-top: 10px; width: 100%; }
+        input { padding: 10px; width: 80%; margin-bottom: 10px; }
     </style>
 </head>
 <body>
-<div class="container">
-    <h1>🎰 BINGO 🎰</h1>
-    
-    <div id="setup-area">
-        <input type="text" id="player-name" placeholder="ໃສ່ຊື່ຂອງທ່ານ..." required>
-        <button class="btn" onclick="startGame()">ເລີ່ມຫຼິ້ນ</button>
-    </div>
-    
-    <div id="game-area" style="display: none;">
-        <button class="btn" style="background:#ff4757;" onclick="initAudio()">🔊 ເປີດສຽງ</button>
-        <div id="room-status" style="font-weight:bold; margin-top:10px;">ລໍຖ້າເລີ່ມ...</div>
+    <div class="container">
+        <h1>BINGO X JENNIE</h1>
         
-        <div id="host-controls" style="display:none; margin-top:15px;">
-            <button class="btn" style="background:#1e90ff;" onclick="toggleAuto()">▶️ ເລີ່ມ/ຢຸດ ອໍໂຕ້ (5s)</button>
-            <button class="btn" style="background:#ff9f43;" onclick="resetGame()">🔄 ລ້າງກະດານ</button>
+        <div id="setup-area">
+            <input type="text" id="player-name" placeholder="ໃສ່ຊື່ຂອງທ່ານ...">
+            <button class="btn" onclick="startGame()">ເຂົ້າຮ່ວມເກມ</button>
         </div>
-        
-        <div class="grid" id="bingo-board"></div>
-        <p><strong>ເລກທີ່ອອກແລ້ວ:</strong> <span id="number-list"></span></p>
+
+        <div id="game-area" style="display:none;">
+            <div id="status-display" style="font-weight:bold; font-size:1.2em; color:red;">ລໍຖ້າເລີ່ມ...</div>
+            <div id="host-controls" style="display:none;">
+                <button class="btn" onclick="toggleAuto()">▶️ ເລີ່ມ/ຢຸດ ອໍໂຕ້</button>
+                <button class="btn" onclick="resetGame()">🔄 ເລີ່ມເກມໃໝ່</button>
+            </div>
+            <div class="grid" id="bingo-board"></div>
+            <p>ເລກທີ່ອອກແລ້ວ: <span id="called-numbers"></span></p>
+        </div>
     </div>
-</div>
 
-<script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-    import { getDatabase, ref, set, onValue, update } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+        import { getDatabase, ref, set, onValue, update } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
 
-    const firebaseConfig = { apiKey: "AIzaSyBOW0m7tdZl95srB6Mh2AcxNp9GQkTITrl", databaseURL: "https://bingoxjennie-default-rtdb.asia-southeast1.firebasedatabase.app", projectId: "bingoxjennie" };
-    const db = getDatabase(initializeApp(firebaseConfig));
-    const gameRef = ref(db, 'game_room');
+        const db = getDatabase(initializeApp({ apiKey: "AIzaSyBOW0m7tdZl95srB6Mh2AcxNp9GQkTITrl", databaseURL: "https://bingoxjennie-default-rtdb.asia-southeast1.firebasedatabase.app", projectId: "bingoxjennie" }));
+        const gameRef = ref(db, 'game_room');
 
-    let pName = "";
-    let autoInterval = null;
+        let pName = "";
+        window.startGame = () => {
+            pName = document.getElementById('player-name').value;
+            if(!pName) return alert("ກະລຸນາໃສ່ຊື່!");
+            document.getElementById('setup-area').style.display = 'none';
+            document.getElementById('game-area').style.display = 'block';
+            generateBoard();
+        };
 
-    // ຟັງຊັນເລີ່ມຕົ້ນ
-    window.startGame = () => {
-        const name = document.getElementById('player-name').value;
-        if(!name) return alert("ກະລຸນາໃສ່ຊື່ກ່ອນ!");
-        pName = name;
-        document.getElementById('setup-area').style.display = 'none';
-        document.getElementById('game-area').style.display = 'block';
-        generateBoard();
-    };
-
-    window.initAudio = () => new SpeechSynthesisUtterance("ພ້ອມແລ້ວ").lang = 'th-TH';
-
-    function speak(text, force = false) {
-        if (force) window.speechSynthesis.cancel();
-        const msg = new SpeechSynthesisUtterance(text);
-        msg.lang = 'th-TH';
-        window.speechSynthesis.speak(msg);
-    }
-
-    function generateBoard() {
-        let nums = Array.from({length: 75}, (_, i) => i + 1).sort(() => Math.random() - 0.5).slice(0, 25);
-        nums[12] = "FREE";
-        const board = document.getElementById('bingo-board'); board.innerHTML = "";
-        nums.forEach((n, i) => {
-            const btn = document.createElement('button');
-            btn.className = "cell" + (n === "FREE" ? " free" : "");
-            btn.innerText = n === "FREE" ? "⭐" : n;
-            btn.onclick = () => {
-                const called = document.getElementById('number-list').innerText.split(', ').map(Number);
-                if (n !== "FREE" && !called.includes(n)) return alert("ເລກນີ້ຍັງບໍ່ທັນອອກ!");
-                btn.classList.add('selected');
-                if (checkWin()) update(gameRef, { winner: "🎉 ບິງໂກ! ຜູ້ຊະນະຄື: " + pName });
-            };
-            board.appendChild(btn);
-        });
-    }
-
-    function checkWin() {
-        let cells = Array.from(document.querySelectorAll('.cell'));
-        let m = []; for(let i=0; i<5; i++) m.push(cells.slice(i*5, i*5+5).map(e => e.classList.contains('selected')));
-        for(let i=0; i<5; i++) { if(m[i].every(v => v) || m.map(r => r[i]).every(v => v)) return true; }
-        return [0,1,2,3,4].every(i => m[i][i]) || [0,1,2,3,4].every(i => m[i][4-i]);
-    }
-
-    window.toggleAuto = () => {
-        if(autoInterval) { clearInterval(autoInterval); autoInterval = null; }
-        else autoInterval = setInterval(() => {
-            let called = document.getElementById('number-list').innerText.split(', ').filter(x => x !== "").map(Number);
-            let avail = Array.from({length: 75}, (_, i) => i + 1).filter(n => !called.includes(n));
-            if(avail.length > 0) update(gameRef, { called: [...called, avail[Math.floor(Math.random() * avail.length)]], latest: avail[0] });
-        }, 5000);
-    };
-
-    window.resetGame = () => {
-        set(gameRef, { called: [], latest: "", winner: null });
-        window.speechSynthesis.cancel();
-        generateBoard();
-        document.getElementById('room-status').innerText = "ລໍຖ້າເລີ່ມ...";
-    };
-
-    onValue(gameRef, (snap) => {
-        const data = snap.val(); if(!data) return;
-        document.getElementById('number-list').innerText = (data.called || []).join(', ');
-        if(data.winner) {
-            document.getElementById('room-status').innerHTML = "<h2 style='color:red;'>" + data.winner + "</h2>";
-            clearInterval(autoInterval); autoInterval = null;
-            speak("ບິງໂກ! ຜູ້ຊະນະຄື " + data.winner.split(': ')[1], true);
-        } else if(data.latest) {
-            document.getElementById('room-status').innerText = "ເລກຫຼ້າສຸດ: " + data.latest;
-            speak("ໝາຍເລກ " + data.latest);
+        function generateBoard() {
+            let nums = Array.from({length: 75}, (_, i) => i + 1).sort(() => Math.random() - 0.5).slice(0, 25);
+            nums[12] = "FREE";
+            const board = document.getElementById('bingo-board');
+            board.innerHTML = "";
+            nums.forEach((n) => {
+                const div = document.createElement('div');
+                div.className = "cell" + (n === "FREE" ? " free selected" : "");
+                div.innerText = n === "FREE" ? "★" : n;
+                div.onclick = () => {
+                    const called = document.getElementById('called-numbers').innerText.split(', ');
+                    if (called.includes(n.toString()) || n === "FREE") {
+                        div.classList.add('selected');
+                        if (checkWin()) update(gameRef, { winner: pName });
+                    }
+                };
+                board.appendChild(div);
+            });
         }
-    });
 
-    if((new URLSearchParams(window.location.search)).get('host') === 'true') document.getElementById('host-controls').style.display = 'block';
-</script>
+        function checkWin() {
+            let cells = Array.from(document.querySelectorAll('.cell'));
+            let matrix = []; for(let i=0; i<5; i++) matrix.push(cells.slice(i*5, i*5+5).map(e => e.classList.contains('selected')));
+            for(let i=0; i<5; i++) { if(matrix[i].every(v => v) || matrix.map(r => r[i]).every(v => v)) return true; }
+            return [0,1,2,3,4].every(i => matrix[i][i]) || [0,1,2,3,4].every(i => matrix[i][4-i]);
+        }
+
+        let autoInterval = null;
+        window.toggleAuto = () => {
+            if(autoInterval) { clearInterval(autoInterval); autoInterval = null; }
+            else autoInterval = setInterval(() => {
+                let n = Math.floor(Math.random() * 75) + 1;
+                update(gameRef, { latest: n });
+            }, 5000);
+        };
+
+        window.resetGame = () => set(gameRef, { called: [], winner: null, latest: null });
+
+        onValue(gameRef, (snap) => {
+            const data = snap.val();
+            if(!data) return;
+            if(data.winner) {
+                document.getElementById('status-display').innerHTML = `🎉 Winner: ${data.winner}`;
+                clearInterval(autoInterval);
+            } else if(data.latest) {
+                document.getElementById('status-display').innerText = "ເລກຫຼ້າສຸດ: " + data.latest;
+                window.speechSynthesis.speak(new SpeechSynthesisUtterance(data.latest.toString()));
+            }
+        });
+
+        if(new URLSearchParams(window.location.search).get('host')) document.getElementById('host-controls').style.display = 'block';
+    </script>
 </body>
 </html>
