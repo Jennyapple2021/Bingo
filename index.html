@@ -6,13 +6,12 @@
     <title>BINGO X JENNIE</title>
     <style>
         body { font-family: sans-serif; background: #f0f2f5; text-align: center; padding: 20px; }
-        .container { max-width: 500px; margin: auto; background: white; padding: 20px; border-radius: 15px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
-        h1 { color: #ff0000; }
+        .container { max-width: 500px; margin: auto; background: white; padding: 20px; border-radius: 15px; }
         .grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 5px; margin-top: 15px; }
         .cell { aspect-ratio: 1; border: 1px solid #ccc; display: flex; align-items: center; justify-content: center; font-weight: bold; cursor: pointer; background: #fff; }
         .cell.selected { background: #ff4757; color: white; }
         .cell.free { background: #ffa502; color: black; }
-        button.btn { background: #ff4757; color: white; padding: 12px; border: none; border-radius: 5px; width: 100%; margin-top: 10px; cursor: pointer; font-size: 16px; }
+        button.btn { background: #ff4757; color: white; padding: 12px; border: none; border-radius: 5px; width: 100%; margin-top: 10px; cursor: pointer; }
     </style>
 </head>
 <body>
@@ -24,14 +23,14 @@
         </div>
 
         <div id="game-area" style="display:none;">
-            <button class="btn" onclick="initAudio()">🔊 ເປີດສຽງ (ກົດກ່ອນຫຼິ້ນ)</button>
+            <button class="btn" onclick="unlockAudio()">🔊 ເປີດສຽງ (ກົດກ່ອນເລີ່ມ)</button>
             <div id="status-display" style="font-weight:bold; margin-top:15px; color:red;">ລໍຖ້າເລີ່ມ...</div>
             <div id="host-controls" style="display:none;">
-                <button class="btn" style="background:#2ed573;" onclick="toggleAuto()">▶️ ເລີ່ມ/ຢຸດ ອໍໂຕ້</button>
+                <button class="btn" onclick="toggleAuto()">▶️ ເລີ່ມ/ຢຸດ ອໍໂຕ້</button>
                 <button class="btn" onclick="resetGame()">🔄 ເລີ່ມເກມໃໝ່</button>
             </div>
             <div class="grid" id="bingo-board"></div>
-            <p>ເລກທີ່ອອກແລ້ວ: <span id="called-numbers"></span></p>
+            <p>ເລກທີ່ອອກແລ້ວ: <br><span id="called-numbers" style="word-break: break-all;"></span></p>
         </div>
     </div>
 
@@ -44,15 +43,16 @@
 
         let pName = "", autoInterval = null;
 
-        window.initAudio = () => {
-            const utterance = new SpeechSynthesisUtterance("ເປີດສຽງແລ້ວ");
-            utterance.lang = 'th-TH';
-            window.speechSynthesis.speak(utterance);
+        window.unlockAudio = () => {
+            const msg = new SpeechSynthesisUtterance("ພ້ອມຫຼິ້ນແລ້ວ");
+            msg.lang = 'th-TH';
+            window.speechSynthesis.speak(msg);
+            alert("ເປີດສຽງສຳເລັດ!");
         };
 
         window.startGame = () => {
             pName = document.getElementById('player-name').value;
-            if(!pName) return alert("ກະລຸນາໃສ່ຊື່!");
+            if(!pName) return alert("ໃສ່ຊື່ກ່ອນ!");
             document.getElementById('setup-area').style.display = 'none';
             document.getElementById('game-area').style.display = 'block';
             generateBoard();
@@ -72,7 +72,7 @@
                     if (n === "FREE" || called.includes(n.toString())) {
                         div.classList.add('selected');
                         if (checkWin()) update(gameRef, { winner: pName });
-                    }
+                    } else { alert("ເລກນີ້ຍັງບໍ່ທັນອອກ!"); }
                 };
                 board.appendChild(div);
             });
@@ -88,15 +88,16 @@
         window.toggleAuto = () => {
             if(autoInterval) { clearInterval(autoInterval); autoInterval = null; alert("ຢຸດອໍໂຕ້"); }
             else {
-                alert("ເລີ່ມອໍໂຕ້ແລ້ວ");
                 autoInterval = setInterval(() => {
                     onValue(gameRef, (snap) => {
                         let d = snap.val() || {called: []};
-                        let called = d.called || [];
-                        let available = Array.from({length: 75}, (_, i) => i + 1).filter(n => !called.includes(n));
-                        if(available.length > 0) {
-                            let n = available[Math.floor(Math.random() * available.length)];
-                            update(gameRef, { called: [...called, n], latest: n });
+                        if(!d.winner) {
+                            let called = d.called || [];
+                            let available = Array.from({length: 75}, (_, i) => i + 1).filter(n => !called.includes(n));
+                            if(available.length > 0) {
+                                let n = available[Math.floor(Math.random() * available.length)];
+                                update(gameRef, { called: [...called, n], latest: n });
+                            }
                         }
                     }, {onlyOnce: true});
                 }, 5000);
@@ -105,25 +106,30 @@
 
         window.resetGame = () => {
             set(gameRef, { called: [0], winner: null, latest: null });
-            clearInterval(autoInterval);
-            autoInterval = null;
         };
 
         onValue(gameRef, (snap) => {
             const data = snap.val();
             if(!data) return;
-            document.getElementById('called-numbers').innerText = (data.called || []).filter(x => x !== 0).join(', ');
-            
-            if(data.winner) {
-                document.getElementById('status-display').innerHTML = `🎉 Winner: ${data.winner}`;
+
+            // ເມື່ອ reset ຫຼື ຍັງບໍ່ມີຜູ້ຊະນະ
+            if(data.winner === null) {
+                document.getElementById('status-display').innerText = "ລໍຖ້າເລີ່ມເກມ...";
+                if(data.called.length <= 1) { // ຖ້າຂໍ້ມູນຖືກລ້າງ
+                    document.getElementById('called-numbers').innerText = "";
+                    if(document.getElementById('game-area').style.display === 'block') generateBoard();
+                }
+            } else {
+                document.getElementById('called-numbers').innerText = (data.called || []).filter(x => x !== 0).join(', ');
+                document.getElementById('status-display').innerHTML = `🎉 ຜູ້ຊະນະຄື: ${data.winner}`;
                 clearInterval(autoInterval);
-            } else if(data.latest) {
+            }
+
+            if(data.latest && !data.winner) {
                 document.getElementById('status-display').innerText = "ເລກຫຼ້າສຸດ: " + data.latest;
                 let msg = new SpeechSynthesisUtterance("ໝາຍເລກ " + data.latest);
                 msg.lang = 'th-TH';
                 window.speechSynthesis.speak(msg);
-            } else {
-                document.getElementById('status-display').innerText = "ລໍຖ້າເລີ່ມ...";
             }
         });
 
